@@ -1,0 +1,198 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")   // URL directe Supabase (sans pooler) pour les migrations
+  extensions = [postgis]
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  TRANSPORTEUR
+  COMMISSIONNAIRE
+}
+
+enum StatutAbonnement {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum TypeVehicule {
+  PORTEUR
+  SEMI
+  VL
+  UTILITAIRE
+  PLATEAU
+  BENNE
+  CITERNE
+  FOURGON
+}
+
+enum Specificite {
+  HAYON
+  FRIGORIFIQUE
+  BACHE
+  PLATEAU
+  ADR
+  GRUE
+  AMPLIROLL
+  CAISSE_MOBILE
+  SAVOYARDE
+  MEGA
+  DOUBLE_PLANCHER
+  VEHICULE_ACCOMPAGNE
+}
+
+// ─── Utilisateurs ─────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  nom       String
+  telephone String?
+  role      Role
+  verifie   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transporteurProfil    TransporteurProfil?
+  commissionnaireProfil CommissionnaireProfil?
+  abonnement            Abonnement?
+  messagesEnvoyes       Message[]                 @relation("expediteur")
+  participations        ConversationParticipant[]
+}
+
+// ─── Profils ──────────────────────────────────────────────────────────────────
+
+model TransporteurProfil {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  siret         String
+  raisonSociale String
+  description   String?
+
+  // Point de base — requêtes géo via $queryRaw (haversine / PostGIS)
+  latitude  Float
+  longitude Float
+
+  // Codes INSEE département ("75", "69") ou région ("11", "93")
+  zonesCirculation String[]
+
+  disponible  Boolean  @default(false)
+  derniereMAJ DateTime @default(now())
+
+  vehicules Vehicule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([latitude, longitude])
+  @@index([disponible])
+}
+
+model CommissionnaireProfil {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  siret         String
+  raisonSociale String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Véhicules ────────────────────────────────────────────────────────────────
+
+model Vehicule {
+  id             String             @id @default(cuid())
+  transporteurId String
+  transporteur   TransporteurProfil @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+
+  type         TypeVehicule
+  specificites Specificite[]
+
+  // Dimensions en cm
+  longueur Float?
+  largeur  Float?
+  hauteur  Float?
+
+  // Charge utile en kg
+  chargeUtile Float
+
+  immatriculation String?
+  actif           Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transporteurId])
+  @@index([type])
+  @@index([chargeUtile])
+}
+
+// ─── Messagerie ───────────────────────────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  expediteurId   String
+  expediteur     User         @relation("expediteur", fields: [expediteurId], references: [id])
+
+  contenu String
+  lu      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([expediteurId])
+}
+
+// ─── Abonnement / Stripe ──────────────────────────────────────────────────────
+
+model Abonnement {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  statut         StatutAbonnement @default(TRIALING)
+  dateFinEssai   DateTime?
+  dateFinPeriode DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
