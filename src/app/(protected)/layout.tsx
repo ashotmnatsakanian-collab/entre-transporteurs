@@ -10,12 +10,24 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
+  // Sans Stripe configuré : accès libre pour tous les utilisateurs connectés
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar role={session.user.role} />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Navbar user={session.user} />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
+      </div>
+    )
+  }
+
   const abo = await db.abonnement.findUnique({ where: { userId: session.user.id } })
   if (!abo) redirect('/login')
 
   const maintenant = new Date()
 
-  // Expiration silencieuse du trial côté serveur
   if (abo.statut === 'TRIALING' && abo.dateFinEssai && abo.dateFinEssai <= maintenant) {
     await db.abonnement.update({ where: { id: abo.id }, data: { statut: 'PAST_DUE' } })
     redirect('/abonnement/reactivation')
@@ -36,9 +48,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       <div className="flex flex-col flex-1 overflow-hidden">
         <Navbar user={session.user} />
         {joursRestants !== null && <BanniereEssai joursRestants={joursRestants} />}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   )

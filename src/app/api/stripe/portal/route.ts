@@ -4,8 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { stripe } from '@/lib/stripe'
 
-// POST /api/stripe/portal — créer une session Stripe Billing Portal
 export async function POST() {
+  if (!stripe) {
+    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 501 })
+  }
+
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 

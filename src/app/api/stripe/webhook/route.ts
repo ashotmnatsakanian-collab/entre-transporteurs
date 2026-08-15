@@ -3,9 +3,11 @@ import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/db'
 
-export const config = { api: { bodyParser: false } }
-
 export async function POST(req: NextRequest) {
+  if (!stripe) {
+    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 501 })
+  }
+
   const body = await req.text()
   const sig = req.headers.get('stripe-signature')!
 
@@ -22,12 +24,9 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const cs = event.data.object as Stripe.Checkout.Session
         if (cs.mode !== 'subscription' || !cs.subscription) break
-
         const sub = await stripe.subscriptions.retrieve(cs.subscription as string)
-        const customerId = cs.customer as string
-
         await db.abonnement.updateMany({
-          where: { stripeCustomerId: customerId },
+          where: { stripeCustomerId: cs.customer as string },
           data: {
             stripeSubscriptionId: sub.id,
             statut: 'ACTIVE',
@@ -37,22 +36,18 @@ export async function POST(req: NextRequest) {
         })
         break
       }
-
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription
-        const statut = stripeStatutVersLocal(sub.status)
-
         await db.abonnement.updateMany({
           where: { stripeSubscriptionId: sub.id },
           data: {
-            statut,
+            statut: stripeStatutVersLocal(sub.status),
             dateFinPeriode: new Date(sub.current_period_end * 1000),
             dateFinEssai: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
           },
         })
         break
       }
-
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
         await db.abonnement.updateMany({
@@ -61,7 +56,6 @@ export async function POST(req: NextRequest) {
         })
         break
       }
-
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
         if (!invoice.subscription) break
@@ -73,7 +67,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (err) {
-    console.error('[webhook] Traitement', event.type, err)
+    console.error('[webhook]', event.type, err)
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
   }
 

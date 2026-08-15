@@ -18,11 +18,11 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hash(data.password, 12)
 
     // Créer le client Stripe (sans subscription — trial local de 30 jours)
-    let stripeCustomerId: string | undefined
+    let stripeCustomerId: string | null = null
     try {
       stripeCustomerId = await creerClientStripe(data.email.toLowerCase(), data.nom)
     } catch {
-      // Stripe non configuré en dev — on continue sans
+      // Stripe non configuré — on continue sans
     }
 
     const user = await db.user.create({
