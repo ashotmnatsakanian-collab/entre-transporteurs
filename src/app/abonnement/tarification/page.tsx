@@ -21,6 +21,7 @@ export default function TarificationPage() {
 
           <ul className="mt-6 space-y-3 text-left text-slate-700 text-sm flex-1">
             {[
+              '📣 Publiez vos trajets retour et disponibilités',
               '📍 Profil visible sur la carte et en recherche',
               '🔔 Bascule disponible / indisponible en un clic',
               '🚚 Gestion complète de la flotte',
@@ -50,10 +51,10 @@ export default function TarificationPage() {
 
           <ul className="mt-6 space-y-3 text-left text-slate-700 text-sm flex-1">
             {[
+              '📣 Annonces de disponibilité en temps réel',
               '🗺️ Carte interactive en temps réel',
               '🔍 Moteur de recherche géolocalisé',
               '💬 Messagerie illimitée',
-              '📊 Accès à tous les transporteurs disponibles',
               '⚡ Trouvez un transporteur dans l\'immédiat',
             ].map((f) => (
               <li key={f} className="flex items-center gap-2">{f}</li>

@@ -90,6 +90,7 @@ model TransporteurProfil {
   derniereMAJ DateTime @default(now())
 
   vehicules Vehicule[]
+  annonces  Annonce[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -131,12 +132,46 @@ model Vehicule {
   immatriculation String?
   actif           Boolean @default(true)
 
+  annonces Annonce[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([transporteurId])
   @@index([type])
   @@index([chargeUtile])
+}
+
+// ─── Annonces de disponibilité ─────────────────────────────────────────────────
+// Le cœur du modèle "inversé" : un transporteur qui va se retrouver vide publie
+// son trajet retour pour être trouvé — au lieu de rouler à vide.
+
+model Annonce {
+  id             String             @id @default(cuid())
+  transporteurId String
+  transporteur   TransporteurProfil @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+  vehiculeId     String?
+  vehicule       Vehicule?          @relation(fields: [vehiculeId], references: [id], onDelete: SetNull)
+
+  villeDepart String
+  latDepart   Float
+  lngDepart   Float
+
+  // Destination souhaitée — vide = toutes directions
+  villeArrivee String?
+
+  dateDisponibilite    DateTime
+  dateDisponibiliteFin DateTime?
+
+  commentaire String?
+  active      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([latDepart, lngDepart])
+  @@index([dateDisponibilite])
+  @@index([active])
 }
 
 // ─── Messagerie ───────────────────────────────────────────────────────────────

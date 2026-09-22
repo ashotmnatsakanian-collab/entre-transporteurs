@@ -7,6 +7,7 @@ import clsx from 'clsx'
 
 const LIENS_TRANSPORTEUR = [
   { href: '/transporteur', label: 'Dashboard', icon: '📊' },
+  { href: '/transporteur/annonces', label: 'Mes disponibilités', icon: '📣' },
   { href: '/transporteur/profil', label: 'Mon profil', icon: '👤' },
   { href: '/transporteur/flotte', label: 'Ma flotte', icon: '🚚' },
   { href: '/carte', label: 'La carte', icon: '🗺️' },
@@ -16,6 +17,7 @@ const LIENS_TRANSPORTEUR = [
 
 const LIENS_COMMISSIONNAIRE = [
   { href: '/commissionnaire', label: 'Dashboard', icon: '📊' },
+  { href: '/commissionnaire/annonces', label: 'Annonces retour', icon: '📣' },
   { href: '/commissionnaire/recherche', label: 'Recherche', icon: '🔍' },
   { href: '/carte', label: 'La carte', icon: '🗺️' },
   { href: '/messages', label: 'Messages', icon: '💬' },

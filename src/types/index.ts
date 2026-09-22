@@ -64,6 +64,37 @@ export interface FiltresRecherche {
   disponibleSeulement?: boolean
 }
 
+export interface AnnonceAvecVehicule {
+  id: string
+  transporteurId: string
+  villeDepart: string
+  latDepart: number
+  lngDepart: number
+  villeArrivee: string | null
+  dateDisponibilite: string
+  dateDisponibiliteFin: string | null
+  commentaire: string | null
+  active: boolean
+  vehicule: { id: string; type: TypeVehicule; chargeUtile: number } | null
+}
+
+export interface AnnonceRecherche {
+  id: string
+  transporteurId: string
+  villeDepart: string
+  villeArrivee: string | null
+  dateDisponibilite: string
+  dateDisponibiliteFin: string | null
+  commentaire: string | null
+  raisonSociale: string
+  disponible: boolean
+  nom: string
+  telephone: string | null
+  vehiculeType: TypeVehicule | null
+  vehiculeChargeUtile: number | null
+  distance_km: number
+}
+
 export const TYPE_VEHICULE_LABELS: Record<TypeVehicule, string> = {
   PORTEUR: 'Porteur',
   SEMI: 'Semi-remorque',

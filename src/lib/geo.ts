@@ -69,3 +69,89 @@ export async function rechercherParRayon(
     LIMIT 200
   `)
 }
+
+export interface RowAnnonceGeo {
+  id: string
+  transporteurId: string
+  villeDepart: string
+  latDepart: number
+  lngDepart: number
+  villeArrivee: string | null
+  dateDisponibilite: Date
+  dateDisponibiliteFin: Date | null
+  commentaire: string | null
+  raisonSociale: string
+  disponible: boolean
+  nom: string
+  telephone: string | null
+  vehiculeType: string | null
+  vehiculeChargeUtile: number | null
+  distance_km: number
+}
+
+export async function rechercherAnnoncesParRayon(params: {
+  lat: number
+  lng: number
+  rayonKm: number
+  date?: Date
+  villeArrivee?: string
+}): Promise<RowAnnonceGeo[]> {
+  const { lat, lng, rayonKm, date, villeArrivee } = params
+
+  // Sans date précisée : n'affiche que les annonces encore valides (pas expirées depuis plus d'un jour)
+  const clauseDate = date
+    ? Prisma.sql`AND a."dateDisponibilite" <= ${date} AND (a."dateDisponibiliteFin" IS NULL OR a."dateDisponibiliteFin" >= ${date})`
+    : Prisma.sql`AND COALESCE(a."dateDisponibiliteFin", a."dateDisponibilite") >= NOW() - INTERVAL '1 day'`
+
+  // Une annonce "toutes directions" (villeArrivee vide) matche toujours la destination recherchée
+  const clauseArrivee = villeArrivee
+    ? Prisma.sql`AND (a."villeArrivee" IS NULL OR a."villeArrivee" ILIKE ${'%' + villeArrivee + '%'})`
+    : Prisma.sql``
+
+  return db.$queryRaw<RowAnnonceGeo[]>(Prisma.sql`
+    SELECT
+      a.id,
+      a."transporteurId",
+      a."villeDepart",
+      a."latDepart",
+      a."lngDepart",
+      a."villeArrivee",
+      a."dateDisponibilite",
+      a."dateDisponibiliteFin",
+      a.commentaire,
+      tp."raisonSociale",
+      tp.disponible,
+      u.nom,
+      u.telephone,
+      v.type AS "vehiculeType",
+      v."chargeUtile" AS "vehiculeChargeUtile",
+      ROUND(
+        CAST(
+          6371 * acos(
+            LEAST(1.0,
+              cos(radians(${lat})) * cos(radians(a."latDepart"))
+              * cos(radians(a."lngDepart") - radians(${lng}))
+              + sin(radians(${lat})) * sin(radians(a."latDepart"))
+            )
+          )
+        AS NUMERIC), 1
+      ) AS distance_km
+    FROM "Annonce" a
+    JOIN "TransporteurProfil" tp ON tp.id = a."transporteurId"
+    JOIN "User" u ON u.id = tp."userId"
+    LEFT JOIN "Vehicule" v ON v.id = a."vehiculeId"
+    WHERE
+      a.active = true
+      ${clauseDate}
+      ${clauseArrivee}
+      AND 6371 * acos(
+        LEAST(1.0,
+          cos(radians(${lat})) * cos(radians(a."latDepart"))
+          * cos(radians(a."lngDepart") - radians(${lng}))
+          + sin(radians(${lat})) * sin(radians(a."latDepart"))
+        )
+      ) <= ${rayonKm}
+    ORDER BY a."dateDisponibilite" ASC, distance_km ASC
+    LIMIT 200
+  `)
+}

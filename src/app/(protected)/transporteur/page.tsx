@@ -73,7 +73,8 @@ export default async function DashboardTransporteurPage() {
       </div>
 
       {/* Liens rapides */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <QuickLink href="/transporteur/annonces" emoji="📣" label="Mes disponibilités" desc="Publiez vos trajets retour" />
         <QuickLink href="/transporteur/profil" emoji="👤" label="Mon profil" desc="SIRET, zones, localisation" />
         <QuickLink href="/messages" emoji="💬" label="Messagerie" desc="Vos conversations en cours" />
         <QuickLink href="/carte" emoji="🗺️" label="La carte" desc="Voir tous les transporteurs" />

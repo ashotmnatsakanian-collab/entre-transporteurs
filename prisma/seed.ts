@@ -136,6 +136,37 @@ async function main() {
     console.log(`  ✓ Transporteur : ${t.rs}`)
   }
 
+  // ── Annonces de disponibilité (trajets retour) ───────────────────────────────
+  const ANNONCES = [
+    { email: 'jean.dupont@dupont-transport.fr', immat: 'IJ-789-KL', villeDepart: 'Paris', latDepart: 48.8566, lngDepart: 2.3522, villeArrivee: 'Marseille', dansXJours: 2, dureeJours: 3, commentaire: 'Retour à vide prévu, libre dès 6h.' },
+    { email: 'pierre@transport-med.fr', immat: 'GH-567-IJ', villeDepart: 'Marseille', latDepart: 43.2965, lngDepart: 5.3698, villeArrivee: null, dansXJours: 1, dureeJours: 5, commentaire: 'Disponible toutes directions cette semaine.' },
+    { email: 'sophie@gironde-express.fr', immat: 'ST-456-UV', villeDepart: 'Bordeaux', latDepart: 44.8378, lngDepart: -0.5792, villeArrivee: 'Toulouse', dansXJours: 3, dureeJours: 1, commentaire: null },
+    { email: 'marc@nord-fret.fr', immat: 'UV-567-WX', villeDepart: 'Lille', latDepart: 50.6292, lngDepart: 3.0573, villeArrivee: null, dansXJours: 0, dureeJours: 4, commentaire: 'Mega dispo, hayon sur demande.' },
+  ]
+
+  for (const a of ANNONCES) {
+    const user = await db.user.findUnique({ where: { email: a.email }, include: { transporteurProfil: true } })
+    if (!user?.transporteurProfil) continue
+    const existante = await db.annonce.findFirst({
+      where: { transporteurId: user.transporteurProfil.id, villeDepart: a.villeDepart },
+    })
+    if (existante) continue
+    await db.annonce.create({
+      data: {
+        transporteurId: user.transporteurProfil.id,
+        vehiculeId: `seed-${a.immat}`,
+        villeDepart: a.villeDepart,
+        latDepart: a.latDepart,
+        lngDepart: a.lngDepart,
+        villeArrivee: a.villeArrivee,
+        dateDisponibilite: addDays(new Date(), a.dansXJours),
+        dateDisponibiliteFin: addDays(new Date(), a.dansXJours + a.dureeJours),
+        commentaire: a.commentaire,
+      },
+    })
+    console.log(`  ✓ Annonce : ${a.villeDepart} → ${a.villeArrivee ?? 'toutes directions'}`)
+  }
+
   // ── Commissionnaires ─────────────────────────────────────────────────────────
   for (const c of COMMISSIONNAIRES) {
     await db.user.upsert({

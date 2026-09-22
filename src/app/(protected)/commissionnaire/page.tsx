@@ -34,13 +34,19 @@ export default async function DashboardCommissionnairePage() {
         <StatCard label="Abonnement" value={abo?.statut === 'TRIALING' ? 'Essai' : 'Actif'} icon="💳" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <ActionCard
+          href="/commissionnaire/annonces"
+          emoji="📣"
+          label="Annonces de disponibilité"
+          desc="Transporteurs qui reviennent à vide, prêts dans l'immédiat"
+          primary
+        />
         <ActionCard
           href="/commissionnaire/recherche"
           emoji="🔍"
           label="Rechercher un transporteur"
           desc="Filtrez par localisation, type de véhicule, charge utile…"
-          primary
         />
         <ActionCard href="/carte" emoji="🗺️" label="Carte interactive" desc="Visualisez tous les transporteurs disponibles" />
         <ActionCard href="/messages" emoji="💬" label="Messagerie" desc={nbNonLus > 0 ? `${nbNonLus} message(s) non lu(s)` : 'Vos conversations'} />
