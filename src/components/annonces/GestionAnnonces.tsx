@@ -21,12 +21,18 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function estExpiree(a: AnnonceAvecVehicule) {
+  const fin = a.dateDisponibiliteFin ?? a.dateDisponibilite
+  return new Date(fin).getTime() < Date.now() - 24 * 60 * 60 * 1000
+}
+
 export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }: Props) {
   const router = useRouter()
   const [annonces, setAnnonces] = useState(annoncesInitiales)
   const [formOuvert, setFormOuvert] = useState(false)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState('')
+  const [suppressionId, setSuppressionId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     vehiculeId: '',
@@ -82,6 +88,7 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
   }
 
   async function supprimer(id: string) {
+    setSuppressionId(null)
     setAnnonces((prev) => prev.filter((a) => a.id !== id))
     await fetch(`/api/annonces/${id}`, { method: 'DELETE' })
   }
@@ -200,39 +207,54 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
             Aucune disponibilité publiée. Publiez votre prochain trajet retour pour être trouvé par un commissionnaire.
           </p>
         )}
-        {annonces.map((a) => (
-          <div key={a.id} className={`bg-white border rounded-xl p-4 ${a.active ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="font-medium text-slate-800">
-                  📍 {a.villeDepart} → {a.villeArrivee || 'Toutes directions'}
+        {annonces.map((a) => {
+          const expiree = a.active && estExpiree(a)
+          return (
+            <div key={a.id} className={`bg-white border rounded-xl p-4 ${a.active && !expiree ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium text-slate-800">
+                    📍 {a.villeDepart} → {a.villeArrivee || 'Toutes directions'}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    Du {formatDate(a.dateDisponibilite)}
+                    {a.dateDisponibiliteFin && ` au ${formatDate(a.dateDisponibiliteFin)}`}
+                    {a.vehicule && ` · ${TYPE_VEHICULE_LABELS[a.vehicule.type]} · ${a.vehicule.chargeUtile.toLocaleString('fr')} kg`}
+                  </div>
+                  {a.commentaire && <p className="text-xs text-slate-500 mt-1">{a.commentaire}</p>}
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  Du {formatDate(a.dateDisponibilite)}
-                  {a.dateDisponibiliteFin && ` au ${formatDate(a.dateDisponibiliteFin)}`}
-                  {a.vehicule && ` · ${TYPE_VEHICULE_LABELS[a.vehicule.type]} · ${a.vehicule.chargeUtile.toLocaleString('fr')} kg`}
+                <div className="flex items-center gap-2 shrink-0">
+                  {expiree ? (
+                    <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700">Expirée</span>
+                  ) : (
+                    <button
+                      onClick={() => toggleActive(a.id, !a.active)}
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        a.active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {a.active ? 'Active' : 'Pourvue'}
+                    </button>
+                  )}
+                  {suppressionId === a.id ? (
+                    <span className="flex items-center gap-1.5 text-xs">
+                      <span className="text-slate-500">Confirmer ?</span>
+                      <button onClick={() => supprimer(a.id)} className="text-red-600 font-medium hover:underline">Oui</button>
+                      <button onClick={() => setSuppressionId(null)} className="text-slate-500 hover:underline">Non</button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setSuppressionId(a.id)}
+                      className="text-xs px-2.5 py-1 rounded-full text-red-500 hover:bg-red-50"
+                    >
+                      Supprimer
+                    </button>
+                  )}
                 </div>
-                {a.commentaire && <p className="text-xs text-slate-500 mt-1">{a.commentaire}</p>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => toggleActive(a.id, !a.active)}
-                  className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                    a.active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}
-                >
-                  {a.active ? 'Active' : 'Pourvue'}
-                </button>
-                <button
-                  onClick={() => supprimer(a.id)}
-                  className="text-xs px-2.5 py-1 rounded-full text-red-500 hover:bg-red-50"
-                >
-                  Supprimer
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
