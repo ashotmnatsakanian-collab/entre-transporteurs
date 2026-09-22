@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { TypeVehicule, Specificite } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, SPECIFICITE_LABELS } from '@/types'
+import { BadgeNote } from '@/components/avis/Etoiles'
 
 interface Props {
   transporteur: {
@@ -14,7 +15,9 @@ interface Props {
     description: string | null
     disponible: boolean
     distance_km: number
-    user: { id: string; nom: string; telephone: string | null }
+    verifie: boolean
+    note_moyenne: number | null
+    nb_avis: number
     vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number; specificites: Specificite[] }>
   }
 }
@@ -43,10 +46,14 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
             <Link href={`/profils/${t.id}`} className="font-semibold text-slate-800 hover:text-brand-700 hover:underline">
               {t.raisonSociale}
             </Link>
+            {t.verifie && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">✅ Vérifié</span>
+            )}
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-500'}`}>
               {t.disponible ? 'Disponible' : 'Indisponible'}
             </span>
             <span className="text-xs text-slate-400">📍 {t.distance_km} km</span>
+            <BadgeNote moyenne={t.note_moyenne} total={t.nb_avis} />
           </div>
           {t.description && <p className="text-xs text-slate-500 mt-1 line-clamp-1">{t.description}</p>}
         </div>

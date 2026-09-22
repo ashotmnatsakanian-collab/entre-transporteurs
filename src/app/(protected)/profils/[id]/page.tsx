@@ -5,29 +5,55 @@ import { authOptions } from '@/lib/auth'
 import Link from 'next/link'
 import { CarteVehicule } from '@/components/flotte/CarteVehicule'
 import { ContactButton } from '@/components/ui/ContactButton'
+import { SectionAvis } from '@/components/avis/SectionAvis'
+import { BadgeNote } from '@/components/avis/Etoiles'
 
 export default async function ProfilPublicPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   const profil = await db.transporteurProfil.findUnique({
     where: { id: params.id },
     include: {
-      user: { select: { id: true, nom: true, email: true, telephone: true, createdAt: true } },
+      user: { select: { id: true, nom: true, email: true, telephone: true, createdAt: true, verifie: true } },
       vehicules: { where: { actif: true }, orderBy: { type: 'asc' } },
     },
   })
 
   if (!profil) notFound()
 
+  const agregatAvis = await db.avis.aggregate({
+    where: { transporteurId: profil.id },
+    _avg: { note: true },
+    _count: true,
+  })
+
+  const peutNoter =
+    !!session &&
+    session.user.role === 'COMMISSIONNAIRE' &&
+    !!(await db.conversation.findFirst({
+      where: {
+        AND: [
+          { participants: { some: { userId: session.user.id } } },
+          { participants: { some: { userId: profil.user.id } } },
+        ],
+      },
+    }))
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* En-tête */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 flex flex-col sm:flex-row sm:items-start gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">{profil.raisonSociale}</h1>
+            {profil.user.verifie && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">✅ Vérifié</span>
+            )}
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${profil.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
               {profil.disponible ? 'Disponible' : 'Indisponible'}
             </span>
+          </div>
+          <div className="mt-1">
+            <BadgeNote moyenne={agregatAvis._avg.note} total={agregatAvis._count} />
           </div>
           <p className="text-slate-500 text-sm mt-1">SIRET {profil.siret}</p>
           {profil.description && <p className="text-slate-700 text-sm mt-3">{profil.description}</p>}
@@ -68,6 +94,9 @@ export default async function ProfilPublicPage({ params }: { params: { id: strin
           </div>
         )}
       </div>
+
+      {/* Avis */}
+      <SectionAvis transporteurId={profil.id} peutNoter={peutNoter} />
 
       <div className="text-sm text-slate-400">
         <Link href="/commissionnaire/recherche" className="hover:underline">← Retour à la recherche</Link>

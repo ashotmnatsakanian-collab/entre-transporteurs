@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Role } from '@prisma/client'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [role, setRole] = useState<Role>('TRANSPORTEUR')
+  const searchParams = useSearchParams()
+  const roleInitiale = searchParams.get('role') === 'COMMISSIONNAIRE' ? 'COMMISSIONNAIRE' : 'TRANSPORTEUR'
+  const [role, setRole] = useState<Role>(roleInitiale)
   const [form, setForm] = useState({ email: '', password: '', nom: '', telephone: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)

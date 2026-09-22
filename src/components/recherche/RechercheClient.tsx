@@ -18,7 +18,12 @@ interface ResultatRecherche {
   disponible: boolean
   zonesCirculation: string[]
   distance_km: number
-  user: { id: string; nom: string; telephone: string | null; email: string }
+  verifie: boolean
+  note_moyenne: number | null
+  nb_avis: number
+  nom: string
+  telephone: string | null
+  email: string
   vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number; specificites: Specificite[] }>
 }
 
@@ -201,7 +206,13 @@ export default function RechercheClient() {
           </div>
         ) : (
           <div className="flex-1">
-            <CarteInteractive transporteurs={resultats} height="100%" />
+            <CarteInteractive
+              transporteurs={resultats.map((t) => ({
+                ...t,
+                user: { id: t.userId, nom: t.nom, telephone: t.telephone, email: t.email },
+              }))}
+              height="100%"
+            />
           </div>
         )}
       </div>

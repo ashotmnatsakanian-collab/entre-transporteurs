@@ -66,6 +66,7 @@ model User {
   abonnement            Abonnement?
   messagesEnvoyes       Message[]                 @relation("expediteur")
   participations        ConversationParticipant[]
+  avisDonnes            Avis[]                    @relation("auteurAvis")
 }
 
 // ─── Profils ──────────────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ model TransporteurProfil {
 
   vehicules Vehicule[]
   annonces  Annonce[]
+  avis      Avis[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -172,6 +174,27 @@ model Annonce {
   @@index([latDepart, lngDepart])
   @@index([dateDisponibilite])
   @@index([active])
+}
+
+// ─── Avis ─────────────────────────────────────────────────────────────────────
+// Un commissionnaire ayant échangé avec un transporteur peut le noter — la
+// confiance est le nerf de la guerre sur une bourse de fret (à la Trans.eu).
+
+model Avis {
+  id             String             @id @default(cuid())
+  auteurId       String
+  auteur         User               @relation("auteurAvis", fields: [auteurId], references: [id], onDelete: Cascade)
+  transporteurId String
+  transporteur   TransporteurProfil @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+
+  note        Int // 1 à 5
+  commentaire String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([auteurId, transporteurId])
+  @@index([transporteurId])
 }
 
 // ─── Messagerie ───────────────────────────────────────────────────────────────

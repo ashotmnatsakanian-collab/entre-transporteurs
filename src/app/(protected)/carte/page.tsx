@@ -9,12 +9,23 @@ export default async function CartePage() {
   const session = await getServerSession(authOptions)
 
   // Les transporteurs sont gratuits — tous ceux inscrits apparaissent sur la carte
-  const transporteurs = await db.transporteurProfil.findMany({
-    include: {
-      user: { select: { id: true, nom: true, telephone: true, email: true } },
-      vehicules: { where: { actif: true } },
-    },
-  })
+  const [transporteurs, agregatsAvis] = await Promise.all([
+    db.transporteurProfil.findMany({
+      include: {
+        user: { select: { id: true, nom: true, telephone: true, email: true, verifie: true } },
+        vehicules: { where: { actif: true } },
+      },
+    }),
+    db.avis.groupBy({ by: ['transporteurId'], _avg: { note: true }, _count: true }),
+  ])
+
+  const noteParTransporteur = new Map(agregatsAvis.map((a) => [a.transporteurId, a]))
+  const transporteursAvecAvis = transporteurs.map((t) => ({
+    ...t,
+    verifie: t.user.verifie,
+    note_moyenne: noteParTransporteur.get(t.id)?._avg.note ?? null,
+    nb_avis: noteParTransporteur.get(t.id)?._count ?? 0,
+  }))
 
   return (
     <div className="h-full flex flex-col">
@@ -30,7 +41,7 @@ export default async function CartePage() {
       </div>
       <div className="flex-1">
         <CarteInteractive
-          transporteurs={JSON.parse(JSON.stringify(transporteurs))}
+          transporteurs={JSON.parse(JSON.stringify(transporteursAvecAvis))}
           currentUserId={session?.user.id}
         />
       </div>

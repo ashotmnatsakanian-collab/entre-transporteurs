@@ -81,6 +81,7 @@ export interface AnnonceAvecVehicule {
 export interface AnnonceRecherche {
   id: string
   transporteurId: string
+  userId: string
   villeDepart: string
   villeArrivee: string | null
   dateDisponibilite: string
@@ -90,6 +91,9 @@ export interface AnnonceRecherche {
   disponible: boolean
   nom: string
   telephone: string | null
+  verifie: boolean
+  note_moyenne: number | null
+  nb_avis: number
   vehiculeType: TypeVehicule | null
   vehiculeChargeUtile: number | null
   distance_km: number

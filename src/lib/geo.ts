@@ -16,6 +16,9 @@ export interface RowTransporteurGeo {
   nom: string
   telephone: string | null
   email: string
+  verifie: boolean
+  note_moyenne: number | null
+  nb_avis: number
 }
 
 export async function rechercherParRayon(
@@ -43,6 +46,9 @@ export async function rechercherParRayon(
       u.nom,
       u.telephone,
       u.email,
+      u.verifie,
+      av.note_moyenne,
+      COALESCE(av.nb_avis, 0)::int AS nb_avis,
       ROUND(
         CAST(
           6371 * acos(
@@ -56,6 +62,10 @@ export async function rechercherParRayon(
       ) AS distance_km
     FROM "TransporteurProfil" tp
     JOIN "User" u ON u.id = tp."userId"
+    LEFT JOIN (
+      SELECT "transporteurId", AVG(note)::float AS note_moyenne, COUNT(*)::int AS nb_avis
+      FROM "Avis" GROUP BY "transporteurId"
+    ) av ON av."transporteurId" = tp.id
     WHERE
       6371 * acos(
         LEAST(1.0,
@@ -73,6 +83,7 @@ export async function rechercherParRayon(
 export interface RowAnnonceGeo {
   id: string
   transporteurId: string
+  userId: string
   villeDepart: string
   latDepart: number
   lngDepart: number
@@ -84,6 +95,9 @@ export interface RowAnnonceGeo {
   disponible: boolean
   nom: string
   telephone: string | null
+  verifie: boolean
+  note_moyenne: number | null
+  nb_avis: number
   vehiculeType: string | null
   vehiculeChargeUtile: number | null
   distance_km: number
@@ -112,6 +126,7 @@ export async function rechercherAnnoncesParRayon(params: {
     SELECT
       a.id,
       a."transporteurId",
+      tp."userId",
       a."villeDepart",
       a."latDepart",
       a."lngDepart",
@@ -123,6 +138,9 @@ export async function rechercherAnnoncesParRayon(params: {
       tp.disponible,
       u.nom,
       u.telephone,
+      u.verifie,
+      av.note_moyenne,
+      COALESCE(av.nb_avis, 0)::int AS nb_avis,
       v.type AS "vehiculeType",
       v."chargeUtile" AS "vehiculeChargeUtile",
       ROUND(
@@ -140,6 +158,10 @@ export async function rechercherAnnoncesParRayon(params: {
     JOIN "TransporteurProfil" tp ON tp.id = a."transporteurId"
     JOIN "User" u ON u.id = tp."userId"
     LEFT JOIN "Vehicule" v ON v.id = a."vehiculeId"
+    LEFT JOIN (
+      SELECT "transporteurId", AVG(note)::float AS note_moyenne, COUNT(*)::int AS nb_avis
+      FROM "Avis" GROUP BY "transporteurId"
+    ) av ON av."transporteurId" = tp.id
     WHERE
       a.active = true
       ${clauseDate}

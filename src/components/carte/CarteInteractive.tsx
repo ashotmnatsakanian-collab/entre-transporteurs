@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import type { TypeVehicule } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS } from '@/types'
+import { BadgeNote } from '@/components/avis/Etoiles'
 
 interface Transporteur {
   id: string
@@ -18,6 +19,9 @@ interface Transporteur {
   longitude: number
   disponible: boolean
   zonesCirculation: string[]
+  verifie?: boolean
+  note_moyenne?: number | null
+  nb_avis?: number
   user: { id: string; nom: string; telephone: string | null; email: string }
   vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number }>
   distance_km?: number
@@ -78,9 +82,13 @@ export default function CarteInteractive({ transporteurs: initial, currentUserId
           >
             <Popup maxWidth={280}>
               <div className="p-1 min-w-[200px]">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className={`w-2.5 h-2.5 rounded-full inline-block ${t.disponible ? 'bg-green-500' : 'bg-red-400'}`} />
                   <strong className="text-slate-800">{t.raisonSociale}</strong>
+                  {t.verifie && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">✅</span>}
+                </div>
+                <div className="mb-2">
+                  <BadgeNote moyenne={t.note_moyenne ?? null} total={t.nb_avis ?? 0} />
                 </div>
                 {t.description && <p className="text-xs text-slate-500 mb-2">{t.description}</p>}
                 <div className="text-xs text-slate-600 space-y-0.5">
