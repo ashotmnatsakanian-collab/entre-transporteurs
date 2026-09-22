@@ -98,12 +98,7 @@ async function main() {
         telephone: t.tel,
         role: Role.TRANSPORTEUR,
         verifie: true,
-        abonnement: {
-          create: {
-            statut: StatutAbonnement.TRIALING,
-            dateFinEssai: trial,
-          },
-        },
+        // Les transporteurs sont gratuits — pas d'abonnement
         transporteurProfil: {
           create: {
             siret: t.siret,

@@ -53,9 +53,12 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const abo = await db.abonnement.findUnique({ where: { userId: session.user.id } })
-  if (!abo || !abonnementActif(abo.statut, abo.dateFinEssai)) {
-    return NextResponse.json({ error: 'Abonnement requis' }, { status: 402 })
+  // Les transporteurs sont toujours gratuits — seul un commissionnaire doit être abonné
+  if (session.user.role === 'COMMISSIONNAIRE') {
+    const abo = await db.abonnement.findUnique({ where: { userId: session.user.id } })
+    if (!abo || !abonnementActif(abo.statut, abo.dateFinEssai)) {
+      return NextResponse.json({ error: 'Abonnement requis' }, { status: 402 })
+    }
   }
 
   const { destinataireId, premierMessage } = await req.json() as {

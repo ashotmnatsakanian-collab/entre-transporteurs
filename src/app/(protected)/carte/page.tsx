@@ -8,20 +8,11 @@ const CarteInteractive = dynamic(() => import('@/components/carte/CarteInteracti
 export default async function CartePage() {
   const session = await getServerSession(authOptions)
 
+  // Les transporteurs sont gratuits — tous ceux inscrits apparaissent sur la carte
   const transporteurs = await db.transporteurProfil.findMany({
     include: {
       user: { select: { id: true, nom: true, telephone: true, email: true } },
       vehicules: { where: { actif: true } },
-    },
-    where: {
-      user: {
-        abonnement: {
-          OR: [
-            { statut: 'ACTIVE' },
-            { statut: 'TRIALING', dateFinEssai: { gt: new Date() } },
-          ],
-        },
-      },
     },
   })
 

@@ -17,12 +17,14 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hash(data.password, 12)
 
-    // Créer le client Stripe (sans subscription — trial local de 30 jours)
+    // Les transporteurs sont gratuits — seuls les commissionnaires ont un abonnement payant
     let stripeCustomerId: string | null = null
-    try {
-      stripeCustomerId = await creerClientStripe(data.email.toLowerCase(), data.nom)
-    } catch {
-      // Stripe non configuré — on continue sans
+    if (data.role === 'COMMISSIONNAIRE') {
+      try {
+        stripeCustomerId = await creerClientStripe(data.email.toLowerCase(), data.nom)
+      } catch {
+        // Stripe non configuré — on continue sans
+      }
     }
 
     const user = await db.user.create({
@@ -32,13 +34,15 @@ export async function POST(req: NextRequest) {
         nom: data.nom,
         telephone: data.telephone,
         role: data.role,
-        abonnement: {
-          create: {
-            statut: 'TRIALING',
-            dateFinEssai: addDays(new Date(), 30),
-            stripeCustomerId: stripeCustomerId ?? null,
+        ...(data.role === 'COMMISSIONNAIRE' && {
+          abonnement: {
+            create: {
+              statut: 'TRIALING',
+              dateFinEssai: addDays(new Date(), 30),
+              stripeCustomerId: stripeCustomerId ?? null,
+            },
           },
-        },
+        }),
       },
     })
 

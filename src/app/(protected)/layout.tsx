@@ -10,8 +10,8 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
-  // Sans Stripe configuré : accès libre pour tous les utilisateurs connectés
-  if (!process.env.STRIPE_SECRET_KEY) {
+  // Sans Stripe configuré, ou pour un transporteur (toujours gratuit) : accès libre
+  if (!process.env.STRIPE_SECRET_KEY || session.user.role === 'TRANSPORTEUR') {
     return (
       <div className="flex h-screen overflow-hidden">
         <Sidebar role={session.user.role} />

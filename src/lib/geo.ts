@@ -56,14 +56,8 @@ export async function rechercherParRayon(
       ) AS distance_km
     FROM "TransporteurProfil" tp
     JOIN "User" u ON u.id = tp."userId"
-    JOIN "Abonnement" a ON a."userId" = tp."userId"
     WHERE
-      a.statut IN ('TRIALING', 'ACTIVE')
-      AND (
-        a.statut = 'ACTIVE'
-        OR (a.statut = 'TRIALING' AND a."dateFinEssai" > NOW())
-      )
-      AND 6371 * acos(
+      6371 * acos(
         LEAST(1.0,
           cos(radians(${lat})) * cos(radians(tp.latitude))
           * cos(radians(tp.longitude) - radians(${lng}))

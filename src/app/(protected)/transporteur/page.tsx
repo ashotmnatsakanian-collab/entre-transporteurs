@@ -31,7 +31,7 @@ export default async function DashboardTransporteurPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Véhicules actifs" value={profil?.vehicules.length ?? 0} icon="🚚" />
         <StatCard label="Zones" value={profil?.zonesCirculation.length ?? 0} icon="📍" />
-        <StatCard label="Abonnement" value={abo?.statut === 'TRIALING' ? 'Essai' : 'Actif'} icon="💳" />
+        <StatCard label="Abonnement" value={!abo ? 'Gratuit' : abo.statut === 'TRIALING' ? 'Essai' : 'Actif'} icon="💳" />
         <StatCard label="Disponibilité" value={profil?.disponible ? 'Oui' : 'Non'} icon={profil?.disponible ? '🟢' : '🔴'} />
       </div>
 

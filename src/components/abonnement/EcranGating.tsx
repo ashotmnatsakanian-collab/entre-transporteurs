@@ -27,7 +27,7 @@ export function EcranGating({ statut }: { statut: StatutAbonnement }) {
             ? 'Votre dernière facture n\'a pas pu être prélevée. Mettez à jour votre moyen de paiement pour continuer.'
             : 'Votre essai ou abonnement a expiré. Souscrivez pour accéder à toutes les fonctionnalités.'}
         </p>
-        <div className="text-2xl font-bold text-slate-800 mb-1">99 €<span className="text-base text-slate-400 font-normal">/mois TTC</span></div>
+        <div className="text-2xl font-bold text-slate-800 mb-1">69 €<span className="text-base text-slate-400 font-normal">/mois TTC</span></div>
         <p className="text-slate-400 text-xs mb-6">Accès illimité à toutes les fonctionnalités</p>
 
         <button

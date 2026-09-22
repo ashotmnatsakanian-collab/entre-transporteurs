@@ -1,9 +1,7 @@
-import type { NextConfig } from 'next'
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   serverExternalPackages: ['@prisma/client', 'bcryptjs'],
   webpack: (config) => {
-    // Leaflet uses browser APIs — prevent SSR bundling
     config.resolve.fallback = { fs: false, net: false, tls: false }
     return config
   },

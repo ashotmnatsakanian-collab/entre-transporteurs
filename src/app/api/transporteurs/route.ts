@@ -4,23 +4,13 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { profilTransporteurSchema } from '@/lib/validations/profil'
 
-// GET /api/transporteurs — liste tous les transporteurs actifs (pour la carte)
+// GET /api/transporteurs — liste tous les transporteurs (gratuit, pas de gating — pour la carte)
 export async function GET() {
   const transporteurs = await db.transporteurProfil.findMany({
     include: {
       user: { select: { nom: true, email: true, telephone: true } },
       vehicules: { where: { actif: true } },
       _count: { select: { vehicules: true } },
-    },
-    where: {
-      user: {
-        abonnement: {
-          OR: [
-            { statut: 'ACTIVE' },
-            { statut: 'TRIALING', dateFinEssai: { gt: new Date() } },
-          ],
-        },
-      },
     },
   })
   return NextResponse.json(transporteurs)

@@ -43,7 +43,11 @@ export default function RegisterPage() {
   return (
     <>
       <h1 className="text-2xl font-bold text-slate-800 mb-2">Créer un compte</h1>
-      <p className="text-slate-500 text-sm mb-6">1 mois d'essai gratuit — aucune carte requise</p>
+      <p className="text-slate-500 text-sm mb-6">
+        {role === 'TRANSPORTEUR'
+          ? 'Gratuit pour toujours — aucune carte requise'
+          : "1 mois d'essai gratuit, puis 69 €/mois — aucune carte requise aujourd'hui"}
+      </p>
 
       {/* Choix du rôle */}
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -114,7 +118,7 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
         >
-          {loading ? 'Création…' : 'Créer mon compte gratuit'}
+          {loading ? 'Création…' : role === 'TRANSPORTEUR' ? 'Créer mon compte gratuit' : 'Démarrer mon essai gratuit'}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-600">

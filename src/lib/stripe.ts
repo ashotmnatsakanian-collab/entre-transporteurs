@@ -5,7 +5,8 @@ export const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2025-02-24.acacia' })
   : null
 
-export const PRIX_MENSUEL_EUR = 9900
+// Prix de l'abonnement commissionnaire (les transporteurs sont toujours gratuits)
+export const PRIX_MENSUEL_EUR = 6900
 
 export async function creerClientStripe(email: string, nom: string): Promise<string | null> {
   if (!stripe) return null

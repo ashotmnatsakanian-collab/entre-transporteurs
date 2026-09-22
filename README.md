@@ -68,9 +68,9 @@ npm run db:seed
 
 ### 4. Configuration Stripe
 
-1. Créer un produit dans Stripe Dashboard > Produits :
-   - Nom : "Abonnement Entre Transporteurs"
-   - Prix : 99 € / mois récurrent
+1. Créer un produit dans Stripe Dashboard > Produits (uniquement pour les commissionnaires — les transporteurs sont toujours gratuits) :
+   - Nom : "Abonnement Commissionnaire — Entre Transporteurs"
+   - Prix : 69 € / mois récurrent
    - Copier l'ID du prix (`price_xxx`) → `STRIPE_PRICE_ID`
 
 2. Activer le Portail client dans Stripe Dashboard > Paramètres > Portail client
@@ -149,11 +149,12 @@ docker-compose exec app npm run db:seed
 - ✅ Marquage automatique comme lu à l'ouverture de la conversation
 - ✅ Sécurité : seuls les participants peuvent lire la conversation
 
-### Abonnement Stripe
-- ✅ Essai gratuit 30 jours (aucune carte requise)
+### Abonnement Stripe (commissionnaires uniquement)
+- ✅ Transporteurs 100% gratuits : aucun abonnement, aucun gating — ils publient leur disponibilité librement pour ne pas rouler à vide
+- ✅ Commissionnaires : essai gratuit 30 jours (aucune carte requise), puis 69 €/mois TTC
 - ✅ Bannière d'essai avec jours restants (rouge si < 3 jours)
 - ✅ Gating automatique si essai expiré ou abonnement annulé
-- ✅ Stripe Checkout pour souscrire (99 €/mois TTC)
+- ✅ Stripe Checkout pour souscrire (69 €/mois TTC)
 - ✅ Stripe Billing Portal pour gérer / annuler
 - ✅ Webhooks : `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
 
