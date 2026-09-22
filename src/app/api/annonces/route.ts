@@ -3,8 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { annonceSchema, rechercheAnnonceSchema } from '@/lib/validations/annonce'
-import { rechercherAnnoncesParRayon } from '@/lib/geo'
+import { rechercherAnnoncesParRayon, recupererAnnonceDiffusion } from '@/lib/geo'
 import { abonnementActif } from '@/lib/stripe'
+import { getIO } from '@/lib/socket-server'
 
 // GET /api/annonces?mine=1        — mes propres annonces (transporteur)
 // GET /api/annonces?lat=&lng=&... — recherche d'annonces (commissionnaire, abonnement requis)
@@ -82,6 +83,14 @@ export async function POST(req: NextRequest) {
       data: { ...data, transporteurId: profil.id },
       include: { vehicule: true },
     })
+
+    // Diffuser en direct aux commissionnaires qui ont le tableau d'annonces ouvert
+    const io = getIO()
+    if (io) {
+      const diffusion = await recupererAnnonceDiffusion(annonce.id)
+      if (diffusion) io.to('annonces').emit('annonce-created', diffusion)
+    }
+
     return NextResponse.json(annonce, { status: 201 })
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ZodError') {

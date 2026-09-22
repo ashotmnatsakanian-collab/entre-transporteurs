@@ -202,7 +202,18 @@ async function main() {
   const isabelle = await db.user.findUnique({ where: { email: 'isabelle@groupe-fret.fr' } })
   const marie = await db.user.findUnique({ where: { email: 'marie@brossard-logistique.fr' } })
 
-  if (franco && jean) {
+  async function trouverConversation(userIdA: string, userIdB: string) {
+    return db.conversation.findFirst({
+      where: {
+        AND: [
+          { participants: { some: { userId: userIdA } } },
+          { participants: { some: { userId: userIdB } } },
+        ],
+      },
+    })
+  }
+
+  if (franco && jean && !(await trouverConversation(franco.id, jean.id))) {
     const conv1 = await db.conversation.create({
       data: {
         participants: {
@@ -220,7 +231,7 @@ async function main() {
     console.log('  ✓ Conversation 1 : TLF Paris ↔ Dupont Transport')
   }
 
-  if (isabelle && marie) {
+  if (isabelle && marie && !(await trouverConversation(isabelle.id, marie.id))) {
     const conv2 = await db.conversation.create({
       data: {
         participants: {

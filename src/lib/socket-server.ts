@@ -22,6 +22,11 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
   io.on('connection', (socket) => {
     const userId = socket.handshake.auth.userId as string | undefined
 
+    // Room personnelle — permet de notifier un utilisateur peu importe la page
+    // où il se trouve (badge non-lus, alertes), sans le mélanger avec le contenu
+    // d'une conversation précise (voir `conv:` ci-dessous).
+    if (userId) socket.join(`user:${userId}`)
+
     // ── Messagerie ─────────────────────────────────────────────────────────────
     socket.on('join-conversation', (conversationId: string) => {
       socket.join(`conv:${conversationId}`)
@@ -55,6 +60,15 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
         })
 
         io.to(`conv:${data.conversationId}`).emit('new-message', message)
+
+        // Notifier les autres participants (badge non-lus) même hors de la conversation
+        const autresParticipants = await db.conversationParticipant.findMany({
+          where: { conversationId: data.conversationId, userId: { not: userId } },
+          select: { userId: true },
+        })
+        for (const p of autresParticipants) {
+          io.to(`user:${p.userId}`).emit('unread-message', { conversationId: data.conversationId })
+        }
       } catch (err) {
         socket.emit('error', { message: 'Erreur lors de l\'envoi du message' })
       }
@@ -68,8 +82,7 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
           where: { userId },
           data: { disponible, derniereMAJ: new Date() },
         })
-        // Diffuser à tous les clients sur la carte
-        io.emit('disponibilite-change', { userId, disponible })
+        io.to('carte').emit('disponibilite-change', { userId, disponible })
       } catch {
         socket.emit('error', { message: 'Erreur mise à jour disponibilité' })
       }
@@ -77,6 +90,17 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
 
     socket.on('join-carte', () => {
       socket.join('carte')
+    })
+
+    // ── Annonces de disponibilité ────────────────────────────────────────────────
+    // Room rejointe par les commissionnaires qui ont le tableau d'annonces ouvert,
+    // pour recevoir les nouvelles publications en direct (voir POST /api/annonces).
+    socket.on('join-annonces', () => {
+      socket.join('annonces')
+    })
+
+    socket.on('leave-annonces', () => {
+      socket.leave('annonces')
     })
   })
 

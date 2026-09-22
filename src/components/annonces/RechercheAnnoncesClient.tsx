@@ -1,8 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { io } from 'socket.io-client'
 import { TYPE_VEHICULE_LABELS, type AnnonceRecherche } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 
@@ -10,7 +12,17 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr', { day: 'numeric', month: 'short' })
 }
 
-function CarteAnnonce({ a }: { a: AnnonceRecherche }) {
+// Même formule que côté serveur (src/lib/geo.ts) — calcul client pour les
+// annonces reçues en direct par Socket.io, avant tout aller-retour réseau.
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const rad = Math.PI / 180
+  const d = 6371 * Math.acos(
+    Math.min(1, Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad) + Math.sin(lat1 * rad) * Math.sin(lat2 * rad))
+  )
+  return Math.round(d * 10) / 10
+}
+
+function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -27,10 +39,15 @@ function CarteAnnonce({ a }: { a: AnnonceRecherche }) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 hover:border-brand-300 hover:shadow-sm transition-all">
+    <div className={`bg-white border rounded-xl p-4 hover:shadow-sm transition-all ${nouvelle ? 'border-brand-400 ring-2 ring-brand-100' : 'border-slate-200 hover:border-brand-300'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
+            {nouvelle && (
+              <span className="text-[11px] font-semibold text-white bg-brand-600 px-2 py-0.5 rounded-full animate-pulse">
+                🆕 Nouvelle
+              </span>
+            )}
             <Link href={`/profils/${a.transporteurId}`} className="font-semibold text-slate-800 hover:text-brand-700 hover:underline">
               {a.raisonSociale}
             </Link>
@@ -65,6 +82,7 @@ function CarteAnnonce({ a }: { a: AnnonceRecherche }) {
 }
 
 export function RechercheAnnoncesClient() {
+  const { data: session } = useSession()
   const [filtres, setFiltres] = useState({
     lat: 48.8566,
     lng: 2.3522,
@@ -72,7 +90,11 @@ export function RechercheAnnoncesClient() {
     date: '',
     villeArrivee: '',
   })
+  const filtresRef = useRef(filtres)
+  useEffect(() => { filtresRef.current = filtres }, [filtres])
+
   const [resultats, setResultats] = useState<AnnonceRecherche[]>([])
+  const [nouvellesIds, setNouvellesIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [rechercheFaite, setRechercheFaite] = useState(false)
   const [erreur, setErreur] = useState('')
@@ -106,6 +128,38 @@ export function RechercheAnnoncesClient() {
     rechercher()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Tableau vivant : une nouvelle annonce publiée pendant qu'on regarde apparaît
+  // aussitôt si elle correspond aux critères actuels, sans recharger la page.
+  useEffect(() => {
+    const socket = io({ path: '/api/socket', auth: { userId: session?.user.id } })
+    socket.emit('join-annonces')
+
+    socket.on('annonce-created', (a: Omit<AnnonceRecherche, 'distance_km'> & { latDepart: number; lngDepart: number }) => {
+      const f = filtresRef.current
+      const distance = distanceKm(f.lat, f.lng, a.latDepart, a.lngDepart)
+      if (distance > f.rayonKm) return
+      if (f.villeArrivee && a.villeArrivee && !a.villeArrivee.toLowerCase().includes(f.villeArrivee.toLowerCase())) return
+      if (f.date) {
+        const date = new Date(f.date)
+        const debut = new Date(a.dateDisponibilite)
+        const fin = a.dateDisponibiliteFin ? new Date(a.dateDisponibiliteFin) : debut
+        if (date < debut || date > fin) return
+      }
+
+      setResultats((prev) => [{ ...a, distance_km: distance }, ...prev.filter((r) => r.id !== a.id)])
+      setNouvellesIds((prev) => new Set(prev).add(a.id))
+      setTimeout(() => {
+        setNouvellesIds((prev) => {
+          const next = new Set(prev)
+          next.delete(a.id)
+          return next
+        })
+      }, 8000)
+    })
+
+    return () => { socket.disconnect() }
+  }, [session])
 
   return (
     <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -175,7 +229,7 @@ export function RechercheAnnoncesClient() {
           <p className="text-slate-400 text-sm text-center pt-16">Aucune annonce pour ces critères. Élargissez le rayon ou la date.</p>
         )}
         {resultats.map((a) => (
-          <CarteAnnonce key={a.id} a={a} />
+          <CarteAnnonce key={a.id} a={a} nouvelle={nouvellesIds.has(a.id)} />
         ))}
       </div>
     </div>

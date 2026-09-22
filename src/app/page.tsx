@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { db } from '@/lib/db'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -10,6 +11,20 @@ export default async function Home() {
     if (session.user.role === 'TRANSPORTEUR') redirect('/transporteur')
     else redirect('/commissionnaire')
   }
+
+  const [nbTransporteurs, nbAnnoncesActives, nbCommissionnaires] = await Promise.all([
+    db.transporteurProfil.count(),
+    db.annonce.count({
+      where: {
+        active: true,
+        OR: [
+          { dateDisponibiliteFin: { gte: new Date() } },
+          { AND: [{ dateDisponibiliteFin: null }, { dateDisponibilite: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
+        ],
+      },
+    }),
+    db.commissionnaireProfil.count(),
+  ])
 
   return (
     <div className="min-h-screen bg-white">
@@ -48,6 +63,23 @@ export default async function Home() {
             📋 Je cherche un transporteur
           </Link>
         </div>
+
+        {(nbTransporteurs > 0 || nbAnnoncesActives > 0) && (
+          <div className="mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-slate-900">{nbTransporteurs}</div>
+              <div className="text-xs text-slate-500">transporteur{nbTransporteurs > 1 ? 's' : ''} inscrit{nbTransporteurs > 1 ? 's' : ''}</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-slate-900">{nbAnnoncesActives}</div>
+              <div className="text-xs text-slate-500">annonce{nbAnnoncesActives > 1 ? 's' : ''} active{nbAnnoncesActives > 1 ? 's' : ''} en ce moment</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-slate-900">{nbCommissionnaires}</div>
+              <div className="text-xs text-slate-500">commissionnaire{nbCommissionnaires > 1 ? 's' : ''} sur la plateforme</div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Comment ça marche */}

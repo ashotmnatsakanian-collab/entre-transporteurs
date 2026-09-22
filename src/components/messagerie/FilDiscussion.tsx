@@ -55,6 +55,11 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
       }
     })
 
+    // L'interlocuteur vient de lire nos messages — mettre à jour l'indicateur "· Lu" sans recharger
+    socket.on('messages-read', () => {
+      setMessages((prev) => prev.map((m) => (m.expediteur.id === currentUser.id ? { ...m, lu: true } : m)))
+    })
+
     return () => {
       socket.emit('leave-conversation', conversation.id)
       socket.disconnect()

@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { FilDiscussion } from '@/components/messagerie/FilDiscussion'
+import { getIO } from '@/lib/socket-server'
 
 export default async function ConversationPage({ params }: { params: { conversationId: string } }) {
   const session = await getServerSession(authOptions)
@@ -24,10 +25,13 @@ export default async function ConversationPage({ params }: { params: { conversat
   if (!conversation) notFound()
 
   // Marquer les messages reçus comme lus
-  await db.message.updateMany({
+  const { count } = await db.message.updateMany({
     where: { conversationId: conversation.id, expediteurId: { not: session!.user.id }, lu: false },
     data: { lu: true },
   })
+  if (count > 0) {
+    getIO()?.to(`conv:${conversation.id}`).emit('messages-read', { conversationId: conversation.id })
+  }
 
   const interlocuteur = conversation.participants.find((p) => p.userId !== session!.user.id)?.user
 

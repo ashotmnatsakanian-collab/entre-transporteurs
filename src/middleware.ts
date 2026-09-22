@@ -26,6 +26,8 @@ export const config = {
     '/api/vehicules/:path*',
     '/api/recherche/:path*',
     '/api/messages/:path*',
+    '/api/annonces/:path*',
+    '/api/avis/:path*',
     '/api/stripe/checkout',
     '/api/stripe/portal',
   ],

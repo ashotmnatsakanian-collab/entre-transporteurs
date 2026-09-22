@@ -9,21 +9,23 @@ export function BadgeNonLus({ userId }: { userId: string }) {
   const { data: session } = useSession()
 
   useEffect(() => {
-    // Chargement initial
-    fetch('/api/messages')
-      .then((r) => r.json())
-      .then((convs: Array<{ nonLus: number }>) => {
-        setCount(convs.reduce((acc, c) => acc + c.nonLus, 0))
-      })
-      .catch(() => {})
+    function chargerCompteur() {
+      fetch('/api/messages')
+        .then((r) => r.json())
+        .then((convs: Array<{ nonLus: number }>) => {
+          setCount(convs.reduce((acc, c) => acc + c.nonLus, 0))
+        })
+        .catch(() => {})
+    }
 
-    // Mise à jour en temps réel via Socket.io
+    chargerCompteur()
+
+    // Le serveur notifie l'utilisateur (room personnelle `user:${id}`) dès qu'un
+    // message lui arrive, peu importe la page où il se trouve — on ré-interroge
+    // le total plutôt que d'incrémenter en local pour rester exact (un message
+    // reçu pendant que la conversation est déjà ouverte est aussitôt marqué lu).
     const socket = io({ path: '/api/socket', auth: { userId: session?.user.id } })
-    socket.on('new-message', (msg: { expediteur: { id: string } }) => {
-      if (msg.expediteur.id !== userId) {
-        setCount((n) => n + 1)
-      }
-    })
+    socket.on('unread-message', chargerCompteur)
 
     return () => { socket.disconnect() }
   }, [userId, session])

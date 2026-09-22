@@ -160,14 +160,14 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-slate-500 mb-1">Disponible à partir du</label>
-              <input type="date" required value={form.dateDisponibilite}
+              <input type="date" required min={new Date().toISOString().slice(0, 10)} value={form.dateDisponibilite}
                 onChange={(e) => setForm((p) => ({ ...p, dateDisponibilite: e.target.value }))}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-1">Jusqu'au (optionnel)</label>
-              <input type="date" value={form.dateDisponibiliteFin}
+              <input type="date" min={form.dateDisponibilite} value={form.dateDisponibiliteFin}
                 onChange={(e) => setForm((p) => ({ ...p, dateDisponibiliteFin: e.target.value }))}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />

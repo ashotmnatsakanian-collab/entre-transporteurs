@@ -103,6 +103,47 @@ export interface RowAnnonceGeo {
   distance_km: number
 }
 
+export type RowAnnonceDiffusion = Omit<RowAnnonceGeo, 'distance_km'>
+
+// Récupère une annonce fraîchement créée avec tous les champs d'affichage,
+// pour la diffuser en direct via Socket.io (voir POST /api/annonces).
+// distance_km est omis : chaque client la calcule lui-même selon sa recherche en cours.
+export async function recupererAnnonceDiffusion(id: string): Promise<RowAnnonceDiffusion | null> {
+  const rows = await db.$queryRaw<RowAnnonceDiffusion[]>(Prisma.sql`
+    SELECT
+      a.id,
+      a."transporteurId",
+      tp."userId",
+      a."villeDepart",
+      a."latDepart",
+      a."lngDepart",
+      a."villeArrivee",
+      a."dateDisponibilite",
+      a."dateDisponibiliteFin",
+      a.commentaire,
+      tp."raisonSociale",
+      tp.disponible,
+      u.nom,
+      u.telephone,
+      u.verifie,
+      av.note_moyenne,
+      COALESCE(av.nb_avis, 0)::int AS nb_avis,
+      v.type AS "vehiculeType",
+      v."chargeUtile" AS "vehiculeChargeUtile"
+    FROM "Annonce" a
+    JOIN "TransporteurProfil" tp ON tp.id = a."transporteurId"
+    JOIN "User" u ON u.id = tp."userId"
+    LEFT JOIN "Vehicule" v ON v.id = a."vehiculeId"
+    LEFT JOIN (
+      SELECT "transporteurId", AVG(note)::float AS note_moyenne, COUNT(*)::int AS nb_avis
+      FROM "Avis" GROUP BY "transporteurId"
+    ) av ON av."transporteurId" = tp.id
+    WHERE a.id = ${id}
+    LIMIT 1
+  `)
+  return rows[0] ?? null
+}
+
 export async function rechercherAnnoncesParRayon(params: {
   lat: number
   lng: number
