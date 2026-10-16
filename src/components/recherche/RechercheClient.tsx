@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { TypeVehicule, Specificite } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, SPECIFICITE_LABELS } from '@/types'
 import { ResultatTransporteur } from './ResultatTransporteur'
+import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
 
 const CarteInteractive = dynamic(() => import('@/components/carte/CarteInteractive'), { ssr: false })
 
@@ -38,6 +39,8 @@ export default function RechercheClient() {
     specificites: [] as Specificite[],
     disponibleSeulement: false,
   })
+  const [villeChoisie, setVilleChoisie] = useState(true)
+  const [filtresOuverts, setFiltresOuverts] = useState(true)
   const [resultats, setResultats] = useState<ResultatRecherche[]>([])
   const [loading, setLoading] = useState(false)
   const [rechercheFaite, setRechercheFaite] = useState(false)
@@ -75,31 +78,31 @@ export default function RechercheClient() {
     setResultats(Array.isArray(data) ? data : [])
     setRechercheFaite(true)
     setLoading(false)
+    setFiltresOuverts(false)
   }
 
   return (
     <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
       {/* Panneau filtres */}
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-white overflow-y-auto p-4 shrink-0">
-        <form onSubmit={rechercher} className="space-y-4">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-white md:overflow-y-auto p-4 shrink-0">
+        <button
+          type="button"
+          onClick={() => setFiltresOuverts((o) => !o)}
+          className="md:hidden w-full flex items-center justify-between text-sm font-medium text-slate-700"
+        >
+          <span>🔎 Filtres de recherche</span>
+          <span className="text-slate-400">{filtresOuverts ? '▲' : '▼'}</span>
+        </button>
+        <form onSubmit={rechercher} className={`space-y-4 mt-4 md:mt-0 ${filtresOuverts ? 'block' : 'hidden'} md:block`}>
           <h2 className="font-semibold text-slate-800">Filtres</h2>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Latitude</label>
-              <input type="number" step="0.0001" value={filtres.lat}
-                onChange={(e) => setFiltres((p) => ({ ...p, lat: Number(e.target.value) }))}
-                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Longitude</label>
-              <input type="number" step="0.0001" value={filtres.lng}
-                onChange={(e) => setFiltres((p) => ({ ...p, lng: Number(e.target.value) }))}
-                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-          </div>
+          <VilleAutocomplete
+            label="Autour de la ville de"
+            placeholder="Tapez une ville"
+            valeurInitiale="Paris"
+            onSelect={(v) => { setVilleChoisie(true); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
+            onClear={() => setVilleChoisie(false)}
+          />
 
           <div>
             <label className="block text-xs text-slate-500 mb-1">Rayon (km)</label>
@@ -169,7 +172,7 @@ export default function RechercheClient() {
             Disponibles uniquement
           </label>
 
-          <button type="submit" disabled={loading}
+          <button type="submit" disabled={loading || !villeChoisie}
             className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Recherche…' : '🔍 Rechercher'}

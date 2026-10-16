@@ -28,7 +28,6 @@ export default async function AnnoncesTransporteurPage() {
       <GestionAnnonces
         annoncesInitiales={JSON.parse(JSON.stringify(annonces))}
         vehicules={profil?.vehicules ?? []}
-        positionDefaut={{ lat: profil?.latitude ?? 46.6034, lng: profil?.longitude ?? 1.8883 }}
       />
     </div>
   )

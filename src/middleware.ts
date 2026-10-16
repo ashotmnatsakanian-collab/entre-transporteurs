@@ -23,6 +23,7 @@ export const config = {
     '/abonnement/succes',
     '/abonnement/reactivation',
     '/api/transporteurs/:path*',
+    '/api/commissionnaires/:path*',
     '/api/vehicules/:path*',
     '/api/recherche/:path*',
     '/api/messages/:path*',

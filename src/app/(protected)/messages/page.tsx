@@ -41,9 +41,15 @@ export default async function MessagesPage() {
         <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-3">
           <div className="text-5xl">💬</div>
           <p>Aucune conversation pour l'instant.</p>
-          <Link href="/commissionnaire/recherche" className="text-brand-600 underline text-sm">
-            Chercher un transporteur →
-          </Link>
+          {session!.user.role === 'COMMISSIONNAIRE' ? (
+            <Link href="/commissionnaire/annonces" className="text-brand-600 underline text-sm">
+              Voir les transporteurs disponibles →
+            </Link>
+          ) : (
+            <Link href="/transporteur/annonces" className="text-brand-600 underline text-sm">
+              Publier une disponibilité pour être contacté →
+            </Link>
+          )}
         </div>
       ) : (
         <div className="divide-y overflow-auto">

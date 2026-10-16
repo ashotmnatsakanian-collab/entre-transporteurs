@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { profilTransporteurSchema } from '@/lib/validations/profil'
 
+export const dynamic = 'force-dynamic'
+
 // GET /api/transporteurs — liste tous les transporteurs (gratuit, pas de gating — pour la carte)
 export async function GET() {
   const transporteurs = await db.transporteurProfil.findMany({

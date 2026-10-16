@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { TypeVehicule } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, type AnnonceAvecVehicule } from '@/types'
+import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
 
 interface VehiculeOption {
   id: string
@@ -14,7 +15,6 @@ interface VehiculeOption {
 interface Props {
   annoncesInitiales: AnnonceAvecVehicule[]
   vehicules: VehiculeOption[]
-  positionDefaut: { lat: number; lng: number }
 }
 
 function formatDate(iso: string) {
@@ -26,7 +26,7 @@ function estExpiree(a: AnnonceAvecVehicule) {
   return new Date(fin).getTime() < Date.now() - 24 * 60 * 60 * 1000
 }
 
-export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }: Props) {
+export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
   const router = useRouter()
   const [annonces, setAnnonces] = useState(annoncesInitiales)
   const [formOuvert, setFormOuvert] = useState(false)
@@ -37,8 +37,8 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
   const [form, setForm] = useState({
     vehiculeId: '',
     villeDepart: '',
-    latDepart: positionDefaut.lat,
-    lngDepart: positionDefaut.lng,
+    latDepart: null as number | null,
+    lngDepart: null as number | null,
     villeArrivee: '',
     dateDisponibilite: new Date().toISOString().slice(0, 10),
     dateDisponibiliteFin: '',
@@ -48,6 +48,12 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
   async function publier(e: React.FormEvent) {
     e.preventDefault()
     setErreur('')
+
+    if (form.latDepart === null || form.lngDepart === null) {
+      setErreur('Choisissez la ville de départ dans la liste de suggestions.')
+      return
+    }
+
     setLoading(true)
 
     const res = await fetch('/api/annonces', {
@@ -56,8 +62,8 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
       body: JSON.stringify({
         vehiculeId: form.vehiculeId || null,
         villeDepart: form.villeDepart,
-        latDepart: Number(form.latDepart),
-        lngDepart: Number(form.lngDepart),
+        latDepart: form.latDepart,
+        lngDepart: form.lngDepart,
         villeArrivee: form.villeArrivee || null,
         dateDisponibilite: form.dateDisponibilite,
         dateDisponibiliteFin: form.dateDisponibiliteFin || null,
@@ -107,14 +113,13 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
           <h2 className="font-semibold text-slate-800">Nouvelle disponibilité</h2>
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Ville de départ</label>
-              <input required value={form.villeDepart}
-                onChange={(e) => setForm((p) => ({ ...p, villeDepart: e.target.value }))}
-                placeholder="Ex: Lyon"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
+            <VilleAutocomplete
+              label="Ville de départ"
+              placeholder="Tapez une ville (ex: Lyon)"
+              required
+              onSelect={(v) => setForm((p) => ({ ...p, villeDepart: v.nom, latDepart: v.lat, lngDepart: v.lng }))}
+              onClear={() => setForm((p) => ({ ...p, villeDepart: '', latDepart: null, lngDepart: null }))}
+            />
             <div>
               <label className="block text-xs text-slate-500 mb-1">Véhicule concerné</label>
               <select value={form.vehiculeId}
@@ -131,31 +136,12 @@ export function GestionAnnonces({ annoncesInitiales, vehicules, positionDefaut }
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Latitude départ</label>
-              <input type="number" step="0.0001" required value={form.latDepart}
-                onChange={(e) => setForm((p) => ({ ...p, latDepart: Number(e.target.value) }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Longitude départ</label>
-              <input type="number" step="0.0001" required value={form.lngDepart}
-                onChange={(e) => setForm((p) => ({ ...p, lngDepart: Number(e.target.value) }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Destination souhaitée (optionnel)</label>
-            <input value={form.villeArrivee}
-              onChange={(e) => setForm((p) => ({ ...p, villeArrivee: e.target.value }))}
-              placeholder="Vide = toutes directions"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
+          <VilleAutocomplete
+            label="Destination souhaitée (optionnel — vide = toutes directions)"
+            placeholder="Tapez une ville (ex: Marseille)"
+            onSelect={(v) => setForm((p) => ({ ...p, villeArrivee: v.nom }))}
+            onClear={() => setForm((p) => ({ ...p, villeArrivee: '' }))}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div>

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 import { io } from 'socket.io-client'
 import { TYPE_VEHICULE_LABELS, type AnnonceRecherche } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
+import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr', { day: 'numeric', month: 'short' })
@@ -40,7 +41,7 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
 
   return (
     <div className={`bg-white border rounded-xl p-4 hover:shadow-sm transition-all ${nouvelle ? 'border-brand-400 ring-2 ring-brand-100' : 'border-slate-200 hover:border-brand-300'}`}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             {nouvelle && (
@@ -72,7 +73,7 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
           {a.commentaire && <p className="text-xs text-slate-500 mt-1 italic">"{a.commentaire}"</p>}
         </div>
         <button onClick={() => contacter(a.userId)} disabled={loading}
-          className="text-sm bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors shrink-0"
+          className="text-sm bg-brand-600 text-white px-3 py-2 sm:py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors shrink-0 w-full sm:w-auto"
         >
           {loading ? '…' : `💬 Contacter ${a.nom.split(' ')[0]}`}
         </button>
@@ -90,6 +91,8 @@ export function RechercheAnnoncesClient() {
     date: '',
     villeArrivee: '',
   })
+  const [villeChoisie, setVilleChoisie] = useState(true)
+  const [filtresOuverts, setFiltresOuverts] = useState(false)
   const filtresRef = useRef(filtres)
   useEffect(() => { filtresRef.current = filtres }, [filtres])
 
@@ -120,6 +123,7 @@ export function RechercheAnnoncesClient() {
     }
     setRechercheFaite(true)
     setLoading(false)
+    setFiltresOuverts(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtres.lat, filtres.lng, filtres.rayonKm, filtres.date, filtres.villeArrivee])
 
@@ -163,26 +167,25 @@ export function RechercheAnnoncesClient() {
 
   return (
     <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-white overflow-y-auto p-4 shrink-0">
-        <form onSubmit={(e) => { e.preventDefault(); rechercher() }} className="space-y-4">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r bg-white md:overflow-y-auto p-4 shrink-0">
+        <button
+          type="button"
+          onClick={() => setFiltresOuverts((o) => !o)}
+          className="md:hidden w-full flex items-center justify-between text-sm font-medium text-slate-700"
+        >
+          <span>🔎 Modifier la recherche</span>
+          <span className="text-slate-400">{filtresOuverts ? '▲' : '▼'}</span>
+        </button>
+        <form onSubmit={(e) => { e.preventDefault(); rechercher() }} className={`space-y-4 mt-4 md:mt-0 ${filtresOuverts ? 'block' : 'hidden'} md:block`}>
           <h2 className="font-semibold text-slate-800">Où et quand ?</h2>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Latitude</label>
-              <input type="number" step="0.0001" value={filtres.lat}
-                onChange={(e) => setFiltres((p) => ({ ...p, lat: Number(e.target.value) }))}
-                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Longitude</label>
-              <input type="number" step="0.0001" value={filtres.lng}
-                onChange={(e) => setFiltres((p) => ({ ...p, lng: Number(e.target.value) }))}
-                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-            </div>
-          </div>
+          <VilleAutocomplete
+            label="Autour de la ville de"
+            placeholder="Tapez une ville"
+            valeurInitiale="Paris"
+            onSelect={(v) => { setVilleChoisie(true); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
+            onClear={() => setVilleChoisie(false)}
+          />
 
           <div>
             <label className="block text-xs text-slate-500 mb-1">Rayon (km)</label>
@@ -203,16 +206,14 @@ export function RechercheAnnoncesClient() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Destination souhaitée (optionnel)</label>
-            <input value={filtres.villeArrivee}
-              onChange={(e) => setFiltres((p) => ({ ...p, villeArrivee: e.target.value }))}
-              placeholder="Ex: Marseille"
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <VilleAutocomplete
+            label="Destination souhaitée (optionnel)"
+            placeholder="Ex: Marseille"
+            onSelect={(v) => setFiltres((p) => ({ ...p, villeArrivee: v.nom }))}
+            onClear={() => setFiltres((p) => ({ ...p, villeArrivee: '' }))}
+          />
 
-          <button type="submit" disabled={loading}
+          <button type="submit" disabled={loading || !villeChoisie}
             className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Recherche…' : '🔍 Rechercher'}

@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
+  },
   webpack: (config) => {
     config.resolve.fallback = { fs: false, net: false, tls: false }
     return config

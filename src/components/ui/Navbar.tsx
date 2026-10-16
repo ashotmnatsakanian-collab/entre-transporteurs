@@ -20,7 +20,7 @@ export function Navbar({ user }: NavbarProps) {
       <div className="flex items-center gap-2">
         <span className="text-sm text-slate-600 hidden sm:block">{user.nom}</span>
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => signOut({ callbackUrl: '/' })}
           className="text-sm text-slate-500 hover:text-slate-800 px-2 py-1 hover:bg-slate-100 rounded"
         >
           Déconnexion

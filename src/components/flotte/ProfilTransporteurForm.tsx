@@ -1,8 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { TransporteurProfil } from '@prisma/client'
+import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
+
+const LAT_DEFAUT = 46.6034
+const LNG_DEFAUT = 1.8883
 
 const DEPARTEMENTS_FRANCE = [
   '01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19',
@@ -30,6 +34,21 @@ export function ProfilTransporteurForm({ profil }: Props) {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  // undefined = en cours de résolution ; null = position jamais renseignée
+  const [villeBase, setVilleBase] = useState<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    const positionRenseignee = profil && !(profil.latitude === LAT_DEFAUT && profil.longitude === LNG_DEFAUT)
+    if (!profil || !positionRenseignee) {
+      setVilleBase(null)
+      return
+    }
+    // Géocodage inverse : retrouve le nom de la commune pour l'afficher à la place des coordonnées
+    fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${profil.longitude}&lat=${profil.latitude}&type=municipality`)
+      .then((r) => r.json())
+      .then((d) => setVilleBase(d.features?.[0]?.properties?.name ?? null))
+      .catch(() => setVilleBase(null))
+  }, [profil])
 
   function toggleZone(dep: string) {
     setForm((prev) => ({
@@ -102,22 +121,19 @@ export function ProfilTransporteurForm({ profil }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Point de base (latitude / longitude)</label>
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            type="number" step="0.0001"
-            value={form.latitude}
-            onChange={(e) => setForm((p) => ({ ...p, latitude: Number(e.target.value) }))}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        <label className="block text-sm font-medium text-slate-700 mb-1">Ville de base *</label>
+        {villeBase !== undefined && (
+          <VilleAutocomplete
+            placeholder="Tapez votre ville (ex: Lyon)"
+            valeurInitiale={villeBase ?? ''}
+            onSelect={(v) => setForm((p) => ({ ...p, latitude: v.lat, longitude: v.lng }))}
           />
-          <input
-            type="number" step="0.0001"
-            value={form.longitude}
-            onChange={(e) => setForm((p) => ({ ...p, longitude: Number(e.target.value) }))}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-        <p className="text-xs text-slate-400 mt-1">Utilisez <a href="https://www.latlong.net/" target="_blank" rel="noopener noreferrer" className="underline">latlong.net</a> pour trouver vos coordonnées.</p>
+        )}
+        <p className="text-xs text-slate-400 mt-1">
+          {villeBase
+            ? 'Cette position détermine où vous apparaissez sur la carte et dans les recherches.'
+            : 'Position non renseignée : vous apparaissez actuellement au centre de la France. Choisissez votre ville.'}
+        </p>
       </div>
 
       <div>

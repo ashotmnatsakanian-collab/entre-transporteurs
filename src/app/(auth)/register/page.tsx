@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Role } from '@prisma/client'
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const roleInitiale = searchParams.get('role') === 'COMMISSIONNAIRE' ? 'COMMISSIONNAIRE' : 'TRANSPORTEUR'
@@ -130,5 +130,13 @@ export default function RegisterPage() {
         </Link>
       </p>
     </>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   )
 }

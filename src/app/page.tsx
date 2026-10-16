@@ -64,6 +64,14 @@ export default async function Home() {
           </Link>
         </div>
 
+        {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+          <p className="mt-5 text-sm">
+            <Link href="/login" className="text-brand-600 font-medium hover:underline">
+              👀 Voir une démo en un clic →
+            </Link>
+          </p>
+        )}
+
         {(nbTransporteurs > 0 || nbAnnoncesActives > 0) && (
           <div className="mt-14 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-center">
             <div>

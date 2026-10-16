@@ -33,6 +33,16 @@ export default async function DashboardTransporteurPage() {
       ])
     : [0, null]
 
+  const nbAnnoncesTotal = profil ? await db.annonce.count({ where: { transporteurId: profil.id } }) : 0
+  const profilComplet =
+    !!profil && profil.siret.length === 14 && !(profil.latitude === 46.6034 && profil.longitude === 1.8883)
+  const etapes = [
+    { fait: profilComplet, label: 'Complétez votre profil (SIRET et ville de base)', href: '/transporteur/profil', action: 'Compléter' },
+    { fait: (profil?.vehicules.length ?? 0) > 0, label: 'Ajoutez votre premier véhicule', href: '/transporteur/flotte/nouveau', action: 'Ajouter' },
+    { fait: nbAnnoncesTotal > 0, label: 'Publiez une disponibilité pour être trouvé', href: '/transporteur/annonces', action: 'Publier' },
+  ]
+  const onboardingTermine = etapes.every((e) => e.fait)
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* En-tête */}
@@ -43,6 +53,29 @@ export default async function DashboardTransporteurPage() {
         </div>
         <DisponibiliteToggle disponible={profil?.disponible ?? false} />
       </div>
+
+      {/* Premiers pas — disparaît une fois tout fait */}
+      {!onboardingTermine && (
+        <div className="bg-brand-50 border border-brand-100 rounded-xl p-5">
+          <h2 className="font-semibold text-slate-800 mb-1">👋 Bienvenue ! 3 étapes pour être trouvé par les commissionnaires</h2>
+          <p className="text-sm text-slate-500 mb-4">Gratuit, et ça prend moins de 5 minutes.</p>
+          <ol className="space-y-2">
+            {etapes.map((e, i) => (
+              <li key={e.label} className="flex items-center gap-3 text-sm">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${e.fait ? 'bg-green-500 text-white' : 'bg-white border border-slate-300 text-slate-500'}`}>
+                  {e.fait ? '✓' : i + 1}
+                </span>
+                <span className={e.fait ? 'text-slate-400 line-through' : 'text-slate-700'}>{e.label}</span>
+                {!e.fait && (
+                  <Link href={e.href} className="ml-auto text-brand-600 font-medium hover:underline shrink-0">
+                    {e.action} →
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">

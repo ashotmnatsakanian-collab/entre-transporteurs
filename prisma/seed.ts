@@ -137,34 +137,62 @@ async function main() {
   }
 
   // ── Annonces de disponibilité (trajets retour) ───────────────────────────────
-  const ANNONCES = [
-    { email: 'jean.dupont@dupont-transport.fr', immat: 'IJ-789-KL', villeDepart: 'Paris', latDepart: 48.8566, lngDepart: 2.3522, villeArrivee: 'Marseille', dansXJours: 2, dureeJours: 3, commentaire: 'Retour à vide prévu, libre dès 6h.' },
-    { email: 'pierre@transport-med.fr', immat: 'GH-567-IJ', villeDepart: 'Marseille', latDepart: 43.2965, lngDepart: 5.3698, villeArrivee: null, dansXJours: 1, dureeJours: 5, commentaire: 'Disponible toutes directions cette semaine.' },
-    { email: 'sophie@gironde-express.fr', immat: 'ST-456-UV', villeDepart: 'Bordeaux', latDepart: 44.8378, lngDepart: -0.5792, villeArrivee: 'Toulouse', dansXJours: 3, dureeJours: 1, commentaire: null },
-    { email: 'marc@nord-fret.fr', immat: 'UV-567-WX', villeDepart: 'Lille', latDepart: 50.6292, lngDepart: 3.0573, villeArrivee: null, dansXJours: 0, dureeJours: 4, commentaire: 'Mega dispo, hayon sur demande.' },
+  // Les dates sont relatives à aujourd'hui : relancer le seed rafraîchit les annonces
+  // de démo (sinon elles expirent et le tableau d'annonces apparaît vide).
+  const VILLES = {
+    Paris: { lat: 48.8566, lng: 2.3522 },
+    Marseille: { lat: 43.2965, lng: 5.3698 },
+    Bordeaux: { lat: 44.8378, lng: -0.5792 },
+    Lille: { lat: 50.6292, lng: 3.0573 },
+    Nantes: { lat: 47.2184, lng: -1.5536 },
+    Rennes: { lat: 48.1173, lng: -1.6778 },
+  } as const
+
+  const ANNONCES: Array<{
+    email: string; immat: string; depart: keyof typeof VILLES; arrivee: string | null
+    dansXJours: number; dureeJours: number; commentaire: string | null
+  }> = [
+    { email: 'jean.dupont@dupont-transport.fr', immat: 'IJ-789-KL', depart: 'Paris', arrivee: 'Marseille', dansXJours: 0, dureeJours: 3, commentaire: 'Retour à vide prévu, libre dès 6h.' },
+    { email: 'jean.dupont@dupont-transport.fr', immat: 'AB-123-CD', depart: 'Paris', arrivee: 'Lille', dansXJours: 1, dureeJours: 2, commentaire: 'Porteur 12 t avec hayon, départ le matin.' },
+    { email: 'pierre@transport-med.fr', immat: 'GH-567-IJ', depart: 'Marseille', arrivee: null, dansXJours: 0, dureeJours: 5, commentaire: 'Disponible toutes directions cette semaine.' },
+    { email: 'pierre@transport-med.fr', immat: 'YZ-901-AB', depart: 'Marseille', arrivee: 'Lyon', dansXJours: 2, dureeJours: 2, commentaire: 'Semi bâché, certifié ADR.' },
+    { email: 'sophie@gironde-express.fr', immat: 'ST-456-UV', depart: 'Bordeaux', arrivee: 'Toulouse', dansXJours: 1, dureeJours: 2, commentaire: 'Frigorifique, température dirigée.' },
+    { email: 'sophie@gironde-express.fr', immat: 'OP-123-QR', depart: 'Bordeaux', arrivee: 'Paris', dansXJours: 3, dureeJours: 2, commentaire: null },
+    { email: 'marc@nord-fret.fr', immat: 'UV-567-WX', depart: 'Lille', arrivee: null, dansXJours: 0, dureeJours: 4, commentaire: 'Méga disponible, hayon sur demande.' },
+    { email: 'marc@nord-fret.fr', immat: 'YZ-890-AB', depart: 'Lille', arrivee: 'Strasbourg', dansXJours: 2, dureeJours: 1, commentaire: null },
+    { email: 'anne@loire-transport.fr', immat: 'MN-901-OP', depart: 'Nantes', arrivee: 'Paris', dansXJours: 0, dureeJours: 2, commentaire: 'Porteur hayon plateau, matériaux possibles.' },
+    { email: 'thierry@bretagne-cargo.fr', immat: 'ST-345-UV', depart: 'Rennes', arrivee: 'Lyon', dansXJours: 1, dureeJours: 3, commentaire: 'Semi bâché 24 t.' },
+    { email: 'thierry@bretagne-cargo.fr', immat: 'OP-012-QR', depart: 'Rennes', arrivee: null, dansXJours: 4, dureeJours: 3, commentaire: null },
   ]
 
   for (const a of ANNONCES) {
     const user = await db.user.findUnique({ where: { email: a.email }, include: { transporteurProfil: true } })
     if (!user?.transporteurProfil) continue
+    const ville = VILLES[a.depart]
+    const dates = {
+      dateDisponibilite: addDays(new Date(), a.dansXJours),
+      dateDisponibiliteFin: addDays(new Date(), a.dansXJours + a.dureeJours),
+    }
     const existante = await db.annonce.findFirst({
-      where: { transporteurId: user.transporteurProfil.id, villeDepart: a.villeDepart },
+      where: { transporteurId: user.transporteurProfil.id, villeDepart: a.depart, villeArrivee: a.arrivee },
     })
-    if (existante) continue
-    await db.annonce.create({
-      data: {
-        transporteurId: user.transporteurProfil.id,
-        vehiculeId: `seed-${a.immat}`,
-        villeDepart: a.villeDepart,
-        latDepart: a.latDepart,
-        lngDepart: a.lngDepart,
-        villeArrivee: a.villeArrivee,
-        dateDisponibilite: addDays(new Date(), a.dansXJours),
-        dateDisponibiliteFin: addDays(new Date(), a.dansXJours + a.dureeJours),
-        commentaire: a.commentaire,
-      },
-    })
-    console.log(`  ✓ Annonce : ${a.villeDepart} → ${a.villeArrivee ?? 'toutes directions'}`)
+    if (existante) {
+      await db.annonce.update({ where: { id: existante.id }, data: { ...dates, active: true } })
+    } else {
+      await db.annonce.create({
+        data: {
+          transporteurId: user.transporteurProfil.id,
+          vehiculeId: `seed-${a.immat}`,
+          villeDepart: a.depart,
+          latDepart: ville.lat,
+          lngDepart: ville.lng,
+          villeArrivee: a.arrivee,
+          commentaire: a.commentaire,
+          ...dates,
+        },
+      })
+    }
+    console.log(`  ✓ Annonce : ${a.depart} → ${a.arrivee ?? 'toutes directions'}`)
   }
 
   // ── Commissionnaires ─────────────────────────────────────────────────────────

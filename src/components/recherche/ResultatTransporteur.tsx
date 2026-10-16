@@ -40,7 +40,7 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 hover:border-brand-300 hover:shadow-sm transition-all">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Link href={`/profils/${t.id}`} className="font-semibold text-slate-800 hover:text-brand-700 hover:underline">
@@ -57,9 +57,9 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
           </div>
           {t.description && <p className="text-xs text-slate-500 mt-1 line-clamp-1">{t.description}</p>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           <button onClick={contacter} disabled={contactLoading}
-            className="text-sm bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            className="text-sm bg-brand-600 text-white px-3 py-2 sm:py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors w-full sm:w-auto"
           >
             {contactLoading ? '…' : '💬 Contacter'}
           </button>

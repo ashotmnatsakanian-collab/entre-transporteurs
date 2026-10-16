@@ -29,7 +29,7 @@ export default async function CartePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-6 py-4 border-b bg-white flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 border-b bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Carte des transporteurs</h1>
           <p className="text-sm text-slate-500">{transporteurs.length} transporteur(s) actif(s)</p>
