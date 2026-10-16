@@ -207,3 +207,15 @@ npm run db:seed      # Injecter les données de test
 npm run db:reset     # Réinitialiser la base
 npm run db:studio    # Ouvrir Prisma Studio
 ```
+
+## Partager une démo (lien public temporaire)
+
+```bash
+npm run db:seed                  # données de démonstration (dates d'annonces rafraîchies)
+./scripts/demo-publique.sh       # construit, ouvre un lien public et lance l'app
+```
+
+Le script affiche un lien `https://xxxx.lhr.life` à envoyer (tunnel SSH localhost.run, sans compte).
+Il reste valide tant que le script tourne et que l'ordinateur est allumé. La page de connexion propose
+alors des boutons « Essayer en tant que transporteur / commissionnaire » (variable `NEXT_PUBLIC_DEMO_MODE`,
+à ne **jamais** activer sur une vraie instance de production). Pour un hébergement permanent, voir `render.yaml`.
