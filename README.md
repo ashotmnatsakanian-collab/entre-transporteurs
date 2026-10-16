@@ -1,162 +1,116 @@
 # 🚛 Entre Transporteurs
 
-Bourse de fret géolocalisée mettant en relation **transporteurs** et **commissionnaires de transport**.
+Bourse de fret « inversée » : les **transporteurs** publient gratuitement leurs disponibilités (trajets retour, véhicule libre), les **commissionnaires de transport** les trouvent en direct — ou publient un *besoin de transport* auquel les transporteurs proches répondent.
+
+**Documentation** : [DEPLOIEMENT.md](DEPLOIEMENT.md) (mise en ligne pas à pas) · [SECURITE.md](SECURITE.md) (protections, vérification, limites)
+
+```bash
+npm install
+cp .env.example .env              # puis renseigner NEXTAUTH_SECRET (openssl rand -base64 32)
+npx prisma migrate deploy         # crée les tables
+npm run db:seed                   # données de démonstration (LOCAL uniquement)
+npm run dev                       # http://localhost:3000
+npm test                          # tests unitaires
+npm run verif:securite            # ~136 attaques rejouées contre l'application (serveur lancé)
+```
+
+---
 
 ## Stack technique
 
 | Couche | Technologie |
 |---|---|
-| Front-end | Next.js 14 (App Router) + TypeScript + Tailwind CSS |
-| Back-end | API Routes Next.js |
-| Base de données | PostgreSQL + Prisma ORM + PostGIS |
-| Auth | NextAuth v4 (credentials + JWT) |
-| Carte | Leaflet + react-leaflet + OpenStreetMap |
-| Temps réel | Socket.io (serveur custom Next.js) |
-| Paiement | Stripe (Checkout + Billing Portal + Webhooks) |
-| Infra | Docker + docker-compose |
+| Front-end | Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS |
+| Back-end | Routes API Next.js, validation Zod, serveur Node custom (`server.ts`) |
+| Base de données | PostgreSQL + Prisma 5 (migrations versionnées) |
+| Authentification | NextAuth v4 (identifiants + session JWT), bcrypt |
+| Carte | Leaflet + OpenStreetMap |
+| Temps réel | Socket.io, authentifié par le cookie de session |
+| E-mails | Resend (API HTTP) — simulés dans la console en développement |
+| Paiement | Stripe (désactivé tant que `STRIPE_SECRET_KEY` est absent : offre de lancement gratuite) |
+| Données publiques | api-adresse.data.gouv.fr (villes), recherche-entreprises.api.gouv.fr (vérification SIRET) |
+| Hébergement | Render (`render.yaml`) + Supabase, ou Docker |
 
 ---
 
-## Installation locale (sans Docker)
+## Fonctionnalités
+
+### Transporteur (toujours gratuit)
+- Inscription avec SIRET (badge **« SIRET vérifié »** si l'établissement est actif au répertoire officiel)
+- Publication d'**annonces de disponibilité** (départ, arrivée éventuelle, dates, véhicule) et bascule disponible / indisponible
+- Gestion de la flotte : type, dimensions, charge utile, spécificités
+- Page **« Fret à prendre »** : besoins de transport publiés par des commissionnaires à proximité
+- **Alertes e-mail** sur les besoins correspondant à son secteur
+
+### Commissionnaire
+- **Recherche unifiée** : disponibilités en direct ou recherche détaillée par rayon, véhicule, charge, spécificités
+- **Carte interactive** des transporteurs disponibles, mise à jour en temps réel
+- Publication de **besoins de transport** ; alertes e-mail quand un transporteur publie un trajet correspondant
+- Fiche transporteur, avis (après échange réel), signalement
+
+### Pour tous
+- Messagerie temps réel entre transporteur et commissionnaire (badge de non-lus)
+- Réinitialisation du mot de passe, confirmation d'adresse e-mail
+- Page **Mon compte** : mot de passe, export de ses données (RGPD), suppression du compte
+- Pages légales (mentions, CGU, confidentialité) alimentées par les variables `EDITEUR_*`
+- **Espace administrateur** : utilisateurs (suspension), signalements, journal de sécurité
+- Page d'accueil publique avec aperçu des disponibilités (sans coordonnées)
+
+### Abonnement (commissionnaires, désactivé au lancement)
+- Sans clé Stripe : accès libre à tous (offre de lancement)
+- Avec Stripe : essai 30 jours, puis 69 € TTC/mois, portail de gestion, webhooks signés — voir [DEPLOIEMENT.md](DEPLOIEMENT.md#7-faire-payer-plus-tard)
+
+---
+
+## Développement local
 
 ### Prérequis
 - Node.js 20+
-- PostgreSQL 15+ avec PostGIS installé
-- Stripe CLI (pour les webhooks)
+- PostgreSQL 15+ (PostGIS **non** requis)
 
-### 1. Cloner et installer
+### Installation
 
 ```bash
-git clone <repo>
-cd entre-transporteurs
+git clone <repo> && cd entre-transporteurs
 npm install
-```
-
-### 2. Variables d'environnement
-
-```bash
 cp .env.example .env
 ```
 
-Remplir `.env` :
+Renseigner au minimum dans `.env` :
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/entre_transporteurs"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/entre_transporteurs"
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="$(openssl rand -base64 32)"
-
-# Clés Stripe TEST — dashboard.stripe.com/test/apikeys
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_PRICE_ID="price_..."         # Voir section Stripe ci-dessous
-STRIPE_WEBHOOK_SECRET="whsec_..."   # Voir section Webhook ci-dessous
+NEXTAUTH_SECRET="<openssl rand -base64 32>"
 ```
 
-### 3. Base de données
-
 ```bash
-# Créer la base et activer PostGIS
-psql -U postgres -c "CREATE DATABASE entre_transporteurs;"
-psql -U postgres -d entre_transporteurs -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-
-# Migrer + générer le client Prisma
-npm run db:migrate
-
-# Injecter les données de test
-npm run db:seed
-```
-
-### 4. Configuration Stripe
-
-1. Créer un produit dans Stripe Dashboard > Produits (uniquement pour les commissionnaires — les transporteurs sont toujours gratuits) :
-   - Nom : "Abonnement Commissionnaire — Entre Transporteurs"
-   - Prix : 69 € / mois récurrent
-   - Copier l'ID du prix (`price_xxx`) → `STRIPE_PRICE_ID`
-
-2. Activer le Portail client dans Stripe Dashboard > Paramètres > Portail client
-
-### 5. Webhooks Stripe (développement local)
-
-Installer la [Stripe CLI](https://stripe.com/docs/stripe-cli) puis :
-
-```bash
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-```
-
-Copier le `whsec_...` affiché → `STRIPE_WEBHOOK_SECRET`
-
-### 6. Lancer l'application
-
-```bash
+createdb entre_transporteurs
+npx prisma migrate deploy      # applique prisma/migrations
+npm run db:seed                # comptes et annonces de démonstration
 npm run dev
 ```
 
-Ouvrir [http://localhost:3000](http://localhost:3000)
+Sans `RESEND_API_KEY`, les e-mails (confirmation, mot de passe oublié, alertes) s'affichent dans la console du serveur.
 
----
+### Comptes de démonstration (après `db:seed`, **local uniquement**)
 
-## Installation avec Docker
-
-```bash
-cp .env.example .env
-# Remplir les variables Stripe dans .env
-
-docker-compose up --build
-```
-
-La base de données sera initialisée automatiquement. Pour le seed :
-
-```bash
-docker-compose exec app npm run db:seed
-```
-
----
-
-## Comptes de test (après seed)
-
-| Rôle | Email | Mot de passe |
+| Rôle | E-mail | Mot de passe |
 |---|---|---|
 | Transporteur | jean.dupont@dupont-transport.fr | Password123! |
 | Transporteur | marie@brossard-logistique.fr | Password123! |
 | Commissionnaire | francois@tlf-paris.fr | Password123! |
 | Commissionnaire | isabelle@groupe-fret.fr | Password123! |
 
----
+> Ces comptes ont un mot de passe public : ne jamais les créer en production (`npm run demo:nettoyer` les supprime).
 
-## Fonctionnalités
+### Docker
 
-### Transporteur
-- ✅ Inscription avec profil SIRET / raison sociale
-- ✅ Bascule de disponibilité temps réel (visible sur la carte instantanément)
-- ✅ CRUD complet de la flotte : type, dimensions, charge utile, 12 spécificités
-- ✅ Sélection des zones de circulation par département
-- ✅ Profil public consultable
-
-### Commissionnaire
-- ✅ Moteur de recherche géo : rayon, type véhicule, charge utile, longueur, spécificités, disponibilité
-- ✅ Résultats en liste + basculable sur carte interactive
-- ✅ Profils publics des transporteurs
-
-### Carte interactive
-- ✅ Tous les transporteurs actifs géolocalisés
-- ✅ Indicateur vert/rouge de disponibilité mis à jour en temps réel via WebSocket
-- ✅ Popup avec infos et lien vers profil
-
-### Messagerie
-- ✅ Démarrer une conversation depuis un profil ou un résultat de recherche
-- ✅ Messages en temps réel (Socket.io)
-- ✅ Badge de non-lus en temps réel dans la barre de navigation
-- ✅ Marquage automatique comme lu à l'ouverture de la conversation
-- ✅ Sécurité : seuls les participants peuvent lire la conversation
-
-### Abonnement Stripe (commissionnaires uniquement)
-- ✅ Transporteurs 100% gratuits : aucun abonnement, aucun gating — ils publient leur disponibilité librement pour ne pas rouler à vide
-- ✅ Commissionnaires : essai gratuit 30 jours (aucune carte requise), puis 69 €/mois TTC
-- ✅ Bannière d'essai avec jours restants (rouge si < 3 jours)
-- ✅ Gating automatique si essai expiré ou abonnement annulé
-- ✅ Stripe Checkout pour souscrire (69 €/mois TTC)
-- ✅ Stripe Billing Portal pour gérer / annuler
-- ✅ Webhooks : `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+```bash
+cp .env.example .env           # définir NEXTAUTH_SECRET
+docker-compose up --build      # applique les migrations puis démarre sur :3000
+```
 
 ---
 
@@ -164,48 +118,43 @@ docker-compose exec app npm run db:seed
 
 ```
 entre-transporteurs/
-├── prisma/              # Schéma Prisma + seed
+├── prisma/                 # schéma, migrations versionnées, seed
+├── scripts/                # admin, nettoyage démo, vérification sécurité, lien de démo
+├── tests/                  # tests unitaires (vitest)
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/      # Pages login / register (publiques)
-│   │   ├── (protected)/ # Pages auth requise + check abonnement
-│   │   ├── abonnement/  # Tarification, succès, réactivation
-│   │   └── api/         # Toutes les routes API
-│   ├── components/      # Composants React par domaine
-│   ├── lib/             # Prisma, NextAuth, Stripe, Socket.io, Géo
-│   ├── hooks/           # Hooks React personnalisés
-│   └── types/           # Types TypeScript globaux
-├── server.ts            # Serveur custom Next.js + Socket.io
-└── docker-compose.yml
+│   │   ├── (auth)/         # connexion, inscription, mot de passe, e-mail
+│   │   ├── (legal)/        # mentions légales, CGU, confidentialité
+│   │   ├── (protected)/    # espaces transporteur / commissionnaire / admin / messages / compte
+│   │   └── api/            # routes API (toutes via le wrapper `gerer`)
+│   ├── components/         # composants React par domaine
+│   ├── lib/                # api (garde-fous), auth, env, rate-limit, journal, e-mail, socket, géo…
+│   └── middleware.ts       # authentification des pages + CSP à nonce + en-têtes de sécurité
+├── server.ts               # serveur Next + Socket.io (validation d'environnement, arrêt propre)
+├── render.yaml             # déploiement Render
+└── SECURITE.md · DEPLOIEMENT.md
 ```
 
-### Recherche géospatiale
+Chaque route API suit le même schéma (`src/lib/api.ts`) : protection CSRF, authentification relue en base, rôle/accès, limitation de débit, validation Zod, réponse sans détail interne.
 
-La recherche par rayon utilise la formule **haversine** via `$queryRaw` Prisma et peut être upgradée vers `ST_DWithin` PostGIS pour les grands volumes :
-
-```sql
-SELECT tp.*, ROUND(CAST(
-  6371 * acos(
-    LEAST(1.0, cos(radians($lat)) * cos(radians(tp.latitude))
-    * cos(radians(tp.longitude) - radians($lng))
-    + sin(radians($lat)) * sin(radians(tp.latitude)))
-  ) AS NUMERIC), 1) AS distance_km
-FROM "TransporteurProfil" tp
-WHERE distance_km <= $rayonKm
-```
+La recherche par rayon utilise la formule **haversine** en SQL paramétré (`Prisma.sql`), sans extension PostGIS.
 
 ---
 
-## Scripts disponibles
+## Scripts
 
 ```bash
-npm run dev          # Démarrer en développement (tsx watch)
-npm run build        # Build Next.js
-npm run db:generate  # Régénérer le client Prisma
-npm run db:migrate   # Créer et appliquer une migration
-npm run db:seed      # Injecter les données de test
-npm run db:reset     # Réinitialiser la base
-npm run db:studio    # Ouvrir Prisma Studio
+npm run dev               # développement (tsx watch)
+npm run build             # build de production
+npm start                 # production (refuse de démarrer si la configuration est dangereuse)
+npm test                  # tests unitaires
+npm run typecheck         # vérification TypeScript
+npm run verif:securite    # attaques rejouées contre un serveur lancé (jamais contre la production)
+npm run admin:creer       # crée un administrateur (mot de passe généré)
+npm run demo:nettoyer     # supprime les comptes et données de démonstration
+npm run db:migrate        # (dev) crée une migration après modification de schema.prisma
+npm run db:seed           # (dev) données de démonstration
+npm run db:studio         # interface Prisma
 ```
 
 ## Partager une démo (lien public temporaire)
@@ -215,7 +164,4 @@ npm run db:seed                  # données de démonstration (dates d'annonces 
 ./scripts/demo-publique.sh       # construit, ouvre un lien public et lance l'app
 ```
 
-Le script affiche un lien `https://xxxx.lhr.life` à envoyer (tunnel SSH localhost.run, sans compte).
-Il reste valide tant que le script tourne et que l'ordinateur est allumé. La page de connexion propose
-alors des boutons « Essayer en tant que transporteur / commissionnaire » (variable `NEXT_PUBLIC_DEMO_MODE`,
-à ne **jamais** activer sur une vraie instance de production). Pour un hébergement permanent, voir `render.yaml`.
+Le script affiche un lien `https://xxxx.lhr.life` à envoyer (tunnel SSH localhost.run, sans compte). Il reste valide tant que le script tourne et que l'ordinateur est allumé ; **chaque lancement produit un nouveau lien**. La page de connexion propose alors des boutons « Essayer en tant que transporteur / commissionnaire » (variable `NEXT_PUBLIC_DEMO_MODE`, à ne **jamais** activer sur une vraie instance). Pour un hébergement permanent, voir [DEPLOIEMENT.md](DEPLOIEMENT.md).

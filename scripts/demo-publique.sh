@@ -43,4 +43,6 @@ echo "  ✅ LIEN À ENVOYER : $URL"
 echo "════════════════════════════════════════════════════════"
 echo ""
 
-NODE_ENV=production PORT="$PORT" NEXTAUTH_URL="$URL" npx tsx server.ts
+# Secret éphémère propre à cette démo (les sessions ne survivent pas à un redémarrage)
+NEXTAUTH_SECRET="${NEXTAUTH_SECRET_DEMO:-$(openssl rand -base64 48)}" \
+AUTORISER_MODE_DEMO=1 NODE_ENV=production PORT="$PORT" NEXTAUTH_URL="$URL" npx tsx server.ts

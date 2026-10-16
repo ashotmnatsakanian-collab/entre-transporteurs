@@ -1,36 +1,56 @@
+# Blueprint Render — voir DEPLOIEMENT.md pour le pas-à-pas (Supabase + Render + Resend)
 services:
   - type: web
     name: entre-transporteurs
     runtime: node
+    # "free" s'endort après 15 min d'inactivité (WebSockets coupés, premier chargement lent) :
+    # passer à "starter" avant l'ouverture au public.
     plan: free
     region: frankfurt
+    # --include=dev : next build a besoin de typescript/tailwind, et le serveur démarre avec tsx.
+    # migrate deploy applique les migrations versionnées dans prisma/migrations.
     buildCommand: |
-      npm install &&
+      npm ci --include=dev &&
       npx prisma generate &&
       npx prisma migrate deploy &&
       npm run build
     startCommand: npx tsx server.ts
-    healthCheckPath: /api/auth/providers
+    healthCheckPath: /api/sante
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_OPTIONS
         value: --max-old-space-size=450
-      - key: PORT
-        value: 3000
+      # Render place l'application derrière un reverse proxy : 1 saut à faire confiance pour l'IP client
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       # ── Obligatoires ────────────────────────────────────────────────────────
       - key: DATABASE_URL
-        sync: false
+        sync: false          # Supabase, pooler (port 6543) avec ?pgbouncer=true&connection_limit=1
       - key: DIRECT_URL
-        sync: false
+        sync: false          # Supabase, connexion directe (port 5432) — utilisée par les migrations
       - key: NEXTAUTH_URL
-        sync: false          # ex: https://entre-transporteurs.onrender.com
+        sync: false          # URL publique HTTPS exacte, ex: https://entre-transporteurs.onrender.com
       - key: NEXTAUTH_SECRET
-        generateValue: true  # généré automatiquement par Render
-      # ── Optionnels (Stripe — à ajouter quand tu veux monétiser) ─────────────
+        generateValue: true  # secret aléatoire généré par Render
+      # ── Informations légales (affichées dans les mentions légales / CGU) ─────
+      - key: EDITEUR_NOM
+        sync: false
+      - key: EDITEUR_ADRESSE
+        sync: false
+      - key: EDITEUR_SIRET
+        sync: false
+      - key: EDITEUR_DIRECTEUR
+        sync: false
+      - key: EMAIL_CONTACT
+        sync: false
+      # ── E-mails (confirmation d'adresse, mot de passe oublié, alertes) ───────
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false          # ex: Entre Transporteurs <no-reply@votre-domaine.fr>
+      # ── Paiement (optionnel — laisser vide pendant le lancement gratuit) ─────
       # - key: STRIPE_SECRET_KEY
-      #   sync: false
-      # - key: STRIPE_PUBLISHABLE_KEY
       #   sync: false
       # - key: STRIPE_PRICE_ID
       #   sync: false

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgis/postgis:16-3.4-alpine
+    image: postgres:16-alpine
     container_name: et_postgres
     restart: unless-stopped
     environment:
@@ -26,8 +26,10 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/entre_transporteurs
+      DIRECT_URL: postgresql://postgres:postgres@db:5432/entre_transporteurs
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      # Obligatoire (32+ car.) : openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?définissez NEXTAUTH_SECRET dans .env}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID}
