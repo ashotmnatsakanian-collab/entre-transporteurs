@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import { io } from 'socket.io-client'
 import { TYPE_VEHICULE_LABELS, type AnnonceRecherche } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
+import { PanneauAlertes } from './PanneauAlertes'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr', { day: 'numeric', month: 'short' })
@@ -83,7 +83,6 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
 }
 
 export function RechercheAnnoncesClient() {
-  const { data: session } = useSession()
   const [filtres, setFiltres] = useState({
     lat: 48.8566,
     lng: 2.3522,
@@ -92,6 +91,7 @@ export function RechercheAnnoncesClient() {
     villeArrivee: '',
   })
   const [villeChoisie, setVilleChoisie] = useState(true)
+  const [villeNom, setVilleNom] = useState('Paris')
   const [filtresOuverts, setFiltresOuverts] = useState(false)
   const filtresRef = useRef(filtres)
   useEffect(() => { filtresRef.current = filtres }, [filtres])
@@ -136,7 +136,7 @@ export function RechercheAnnoncesClient() {
   // Tableau vivant : une nouvelle annonce publiée pendant qu'on regarde apparaît
   // aussitôt si elle correspond aux critères actuels, sans recharger la page.
   useEffect(() => {
-    const socket = io({ path: '/api/socket', auth: { userId: session?.user.id } })
+    const socket = io({ path: '/api/socket' })
     socket.emit('join-annonces')
 
     socket.on('annonce-created', (a: Omit<AnnonceRecherche, 'distance_km'> & { latDepart: number; lngDepart: number }) => {
@@ -163,7 +163,7 @@ export function RechercheAnnoncesClient() {
     })
 
     return () => { socket.disconnect() }
-  }, [session])
+  }, [])
 
   return (
     <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -183,7 +183,7 @@ export function RechercheAnnoncesClient() {
             label="Autour de la ville de"
             placeholder="Tapez une ville"
             valeurInitiale="Paris"
-            onSelect={(v) => { setVilleChoisie(true); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
+            onSelect={(v) => { setVilleChoisie(true); setVilleNom(v.nom); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
             onClear={() => setVilleChoisie(false)}
           />
 
@@ -219,6 +219,11 @@ export function RechercheAnnoncesClient() {
             {loading ? 'Recherche…' : '🔍 Rechercher'}
           </button>
         </form>
+        <PanneauAlertes
+          criteres={{ villeDepart: villeNom, latDepart: filtres.lat, lngDepart: filtres.lng, rayonKm: filtres.rayonKm, villeArrivee: filtres.villeArrivee || null }}
+          actif={villeChoisie}
+          visible={filtresOuverts}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">

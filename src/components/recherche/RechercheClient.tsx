@@ -24,7 +24,6 @@ interface ResultatRecherche {
   nb_avis: number
   nom: string
   telephone: string | null
-  email: string
   vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number; specificites: Specificite[] }>
 }
 
@@ -212,7 +211,7 @@ export default function RechercheClient() {
             <CarteInteractive
               transporteurs={resultats.map((t) => ({
                 ...t,
-                user: { id: t.userId, nom: t.nom, telephone: t.telephone, email: t.email },
+                user: { id: t.userId, nom: t.nom, telephone: t.telephone },
               }))}
               height="100%"
             />

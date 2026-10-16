@@ -1,22 +1,21 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { exigerRoleOuRediriger } from '@/lib/garde'
 import Link from 'next/link'
 
 export default async function DashboardCommissionnairePage() {
-  const session = await getServerSession(authOptions)
+  const u = await exigerRoleOuRediriger('COMMISSIONNAIRE')
 
-  const abo = await db.abonnement.findUnique({ where: { userId: session!.user.id } })
-  const profil = await db.commissionnaireProfil.findUnique({ where: { userId: session!.user.id } })
+  const abo = await db.abonnement.findUnique({ where: { userId: u.id } })
+  const profil = await db.commissionnaireProfil.findUnique({ where: { userId: u.id } })
 
   const nbConversations = await db.conversation.count({
-    where: { participants: { some: { userId: session!.user.id } } },
+    where: { participants: { some: { userId: u.id } } },
   })
 
   const nbNonLus = await db.message.count({
     where: {
-      conversation: { participants: { some: { userId: session!.user.id } } },
-      expediteurId: { not: session!.user.id },
+      conversation: { participants: { some: { userId: u.id } } },
+      expediteurId: { not: u.id },
       lu: false,
     },
   })
@@ -31,22 +30,26 @@ export default async function DashboardCommissionnairePage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <StatCard label="Conversations" value={nbConversations} icon="💬" />
         <StatCard label="Messages non lus" value={nbNonLus} icon="📬" />
-        <StatCard label="Abonnement" value={abo?.statut === 'TRIALING' ? 'Essai' : 'Actif'} icon="💳" />
+        <StatCard
+          label="Abonnement"
+          value={process.env.STRIPE_SECRET_KEY ? (abo?.statut === 'TRIALING' ? 'Essai gratuit' : 'Actif') : 'Gratuit (lancement)'}
+          icon="💳"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <ActionCard
-          href="/commissionnaire/annonces"
+          href="/commissionnaire/recherche"
           emoji="📣"
-          label="Annonces de disponibilité"
-          desc="Transporteurs qui reviennent à vide, prêts dans l'immédiat"
+          label="Trouver un transporteur"
+          desc="Disponibilités en direct ou recherche détaillée par véhicule"
           primary
         />
         <ActionCard
-          href="/commissionnaire/recherche"
-          emoji="🔍"
-          label="Rechercher un transporteur"
-          desc="Filtrez par localisation, type de véhicule, charge utile…"
+          href="/commissionnaire/besoins"
+          emoji="📦"
+          label="Publier un besoin"
+          desc="Un fret à transporter ? Les transporteurs proches répondent"
         />
         <ActionCard href="/carte" emoji="🗺️" label="Carte interactive" desc="Visualisez tous les transporteurs disponibles" />
         <ActionCard href="/messages" emoji="💬" label="Messagerie" desc={nbNonLus > 0 ? `${nbNonLus} message(s) non lu(s)` : 'Vos conversations'} />

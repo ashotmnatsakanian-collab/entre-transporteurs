@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { BoutonSignaler } from '@/components/ui/BoutonSignaler'
 
 interface Message {
   id: string
@@ -35,6 +36,7 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
   const [messages, setMessages] = useState<Message[]>(conversation.messages)
   const [contenu, setContenu] = useState('')
   const [envoi, setEnvoi] = useState(false)
+  const [erreurSocket, setErreurSocket] = useState('')
   const socketRef = useRef<Socket | null>(null)
   const basRef = useRef<HTMLDivElement>(null)
 
@@ -43,7 +45,7 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
   }, [messages])
 
   useEffect(() => {
-    const socket = io({ path: '/api/socket', auth: { userId: currentUser.id } })
+    const socket = io({ path: '/api/socket' })
     socketRef.current = socket
     socket.emit('join-conversation', conversation.id)
 
@@ -54,6 +56,11 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
         fetch(`/api/messages/${conversation.id}/lu`, { method: 'PATCH' }).catch(() => {})
       }
     })
+
+    // Erreurs serveur (trop de messages, abonnement expiré…) et perte de connexion
+    socket.on('error', (e: { message?: string }) => setErreurSocket(e?.message ?? 'Une erreur est survenue.'))
+    socket.on('connect_error', () => setErreurSocket('Connexion au serveur de messagerie impossible. Rechargez la page.'))
+    socket.on('connect', () => setErreurSocket(''))
 
     // L'interlocuteur vient de lire nos messages — mettre à jour l'indicateur "· Lu" sans recharger
     socket.on('messages-read', () => {
@@ -85,12 +92,15 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
       <div className="px-6 py-4 border-b bg-white flex items-center gap-4 shrink-0">
         <Link href="/messages" className="text-slate-400 hover:text-slate-600 text-sm">← Retour</Link>
         <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm">
-          {interlocuteur?.nom[0]?.toUpperCase()}
+          {interlocuteur?.nom?.[0]?.toUpperCase()}
         </div>
         <div>
           <div className="font-medium text-slate-800">{interlocuteur?.nom}</div>
           <div className="text-xs text-slate-400">{interlocuteur?.role === 'TRANSPORTEUR' ? 'Transporteur' : 'Commissionnaire'}</div>
         </div>
+        {interlocuteur && interlocuteur.nom !== 'Compte supprimé' && (
+          <div className="ml-auto"><BoutonSignaler cibleId={interlocuteur.id} /></div>
+        )}
       </div>
 
       {/* Messages */}
@@ -124,12 +134,14 @@ export function FilDiscussion({ conversation, currentUser, interlocuteur }: Prop
 
       {/* Zone de saisie */}
       <div className="border-t bg-white px-4 py-3 shrink-0">
+        {erreurSocket && <p className="text-xs text-red-600 mb-2" role="alert">{erreurSocket}</p>}
         <form onSubmit={envoyer} className="flex gap-2">
           <input
             type="text"
             value={contenu}
             onChange={(e) => setContenu(e.target.value)}
             placeholder="Écrire un message…"
+            maxLength={2000}
             className="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <button

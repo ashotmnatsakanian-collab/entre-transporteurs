@@ -1,21 +1,18 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { exigerRoleOuRediriger } from '@/lib/garde'
 import Link from 'next/link'
 import { DisponibiliteToggle } from '@/components/carte/DisponibiliteToggle'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 
 export default async function DashboardTransporteurPage() {
-  const session = await getServerSession(authOptions)
+  const u = await exigerRoleOuRediriger('TRANSPORTEUR')
   const profil = await db.transporteurProfil.findUnique({
-    where: { userId: session!.user.id },
+    where: { userId: u.id },
     include: {
       vehicules: { where: { actif: true }, orderBy: { type: 'asc' } },
     },
   })
-
-  const abo = await db.abonnement.findUnique({ where: { userId: session!.user.id } })
 
   const [nbAnnoncesActives, agregatAvis] = profil
     ? await Promise.all([
@@ -44,7 +41,7 @@ export default async function DashboardTransporteurPage() {
   const onboardingTermine = etapes.every((e) => e.fait)
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
       {/* En-tête */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -86,8 +83,13 @@ export default async function DashboardTransporteurPage() {
           value={agregatAvis?._count ? <BadgeNote moyenne={agregatAvis._avg.note} total={agregatAvis._count} /> : 'Aucun avis'}
           icon="⭐"
         />
-        <StatCard label="Abonnement" value={!abo ? 'Gratuit' : abo.statut === 'TRIALING' ? 'Essai' : 'Actif'} icon="💳" />
-        <StatCard label="Disponibilité" value={profil?.disponible ? 'Oui' : 'Non'} icon={profil?.disponible ? '🟢' : '🔴'} />
+        <StatCard
+          label="SIRET"
+          value={profil?.siretVerifieLe ? 'Vérifié ✅' : profil?.siret ? 'Non vérifié' : 'À renseigner'}
+          icon="🏢"
+          href="/transporteur/profil"
+        />
+        <StatCard label="Disponible maintenant" value={profil?.disponible ? 'Oui' : 'Non'} icon={profil?.disponible ? '🟢' : '⚪'} />
       </div>
 
       {/* Flotte */}
@@ -130,9 +132,9 @@ export default async function DashboardTransporteurPage() {
       {/* Liens rapides */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <QuickLink href="/transporteur/annonces" emoji="📣" label="Mes disponibilités" desc="Publiez vos trajets retour" />
-        <QuickLink href="/transporteur/profil" emoji="👤" label="Mon profil" desc="SIRET, zones, localisation" />
+        <QuickLink href="/transporteur/besoins" emoji="📦" label="Fret à prendre" desc="Commissionnaires près de chez vous" />
+        <QuickLink href="/transporteur/profil" emoji="👤" label="Mon profil" desc="SIRET et ville de base" />
         <QuickLink href="/messages" emoji="💬" label="Messagerie" desc="Vos conversations en cours" />
-        <QuickLink href="/carte" emoji="🗺️" label="La carte" desc="Voir tous les transporteurs" />
       </div>
     </div>
   )

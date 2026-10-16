@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { SouscriptionButton } from '@/components/abonnement/SouscriptionButton'
 
+export const metadata = { title: 'Tarifs — Entre Transporteurs' }
+
 export default function TarificationPage() {
+  // Tant que Stripe n'est pas configuré, personne ne peut payer : on ne promet pas un prélèvement
+  const paiementActif = !!process.env.STRIPE_SECRET_KEY
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-900 to-brand-600 flex flex-col items-center justify-center p-6">
       <Link href="/" className="text-white text-2xl font-bold mb-2">🚛 Entre Transporteurs</Link>
@@ -22,8 +26,8 @@ export default function TarificationPage() {
           <ul className="mt-6 space-y-3 text-left text-slate-700 text-sm flex-1">
             {[
               '📣 Publiez vos trajets retour et disponibilités',
-              '📍 Profil visible sur la carte et en recherche',
-              '🔔 Bascule disponible / indisponible en un clic',
+              '📦 « Fret à prendre » : les besoins des commissionnaires près de vous',
+              '🔔 Alertes e-mail sur les besoins de votre secteur',
               '🚚 Gestion complète de la flotte',
               '💬 Messagerie illimitée',
               '🙅 Ne roulez plus jamais à vide',
@@ -45,24 +49,41 @@ export default function TarificationPage() {
           <div className="inline-block bg-amber-100 text-amber-700 text-sm font-medium px-3 py-1 rounded-full mb-4 mx-auto">
             Commissionnaire
           </div>
-          <h2 className="text-3xl font-bold text-slate-800">69 €<span className="text-lg text-slate-500 font-normal">/mois TTC</span></h2>
-          <p className="text-green-600 font-semibold mt-2">1 mois d'essai gratuit</p>
-          <p className="text-slate-400 text-sm">Aucun prélèvement pendant 30 jours</p>
+          {paiementActif ? (
+            <>
+              <h2 className="text-3xl font-bold text-slate-800">69 €<span className="text-lg text-slate-500 font-normal">/mois TTC</span></h2>
+              <p className="text-green-600 font-semibold mt-2">1 mois d'essai gratuit</p>
+              <p className="text-slate-400 text-sm">Aucun prélèvement pendant 30 jours</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-3xl font-bold text-slate-800">Gratuit</h2>
+              <p className="text-green-600 font-semibold mt-2">Offre de lancement</p>
+              <p className="text-slate-400 text-sm">Tarif prévu ensuite : 69 € TTC/mois — vous serez prévenu au moins 30 jours avant, sans prélèvement automatique.</p>
+            </>
+          )}
 
           <ul className="mt-6 space-y-3 text-left text-slate-700 text-sm flex-1">
             {[
               '📣 Annonces de disponibilité en temps réel',
               '🗺️ Carte interactive en temps réel',
               '🔍 Moteur de recherche géolocalisé',
+              '📦 Publiez vos besoins de transport',
+              '🔔 Alertes e-mail sur les trajets qui vous intéressent',
               '💬 Messagerie illimitée',
-              '⚡ Trouvez un transporteur dans l\'immédiat',
             ].map((f) => (
               <li key={f} className="flex items-center gap-2">{f}</li>
             ))}
           </ul>
 
           <div className="mt-8 space-y-3">
-            <SouscriptionButton />
+            {paiementActif ? (
+              <SouscriptionButton />
+            ) : (
+              <Link href="/register?role=COMMISSIONNAIRE" className="block w-full bg-brand-600 text-white py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors text-center">
+                Créer mon compte gratuit
+              </Link>
+            )}
             <Link href="/register" className="block text-sm text-slate-500 hover:text-slate-800">
               Pas encore de compte ? Créer un compte →
             </Link>
@@ -71,7 +92,7 @@ export default function TarificationPage() {
       </div>
 
       <p className="mt-6 text-brand-200 text-xs">
-        Résiliation possible à tout moment · Paiement sécurisé par Stripe
+        {paiementActif ? 'Résiliation possible à tout moment · Paiement sécurisé par Stripe' : 'Aucune carte bancaire demandée pendant le lancement'}
       </p>
     </div>
   )

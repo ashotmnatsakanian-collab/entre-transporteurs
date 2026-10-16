@@ -14,13 +14,13 @@ export function ProfilCommissionnaireForm({ profil }: Props) {
     siret: profil?.siret ?? '',
   })
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState<{ siretVerifie: boolean; avertissement: string | null } | null>(null)
   const [error, setError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess(false)
+    setSuccess(null)
     setLoading(true)
 
     const res = await fetch('/api/commissionnaires', {
@@ -29,11 +29,12 @@ export function ProfilCommissionnaireForm({ profil }: Props) {
       body: JSON.stringify({ ...form, siret: form.siret.replace(/\s/g, '') }),
     })
 
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const data = await res.json()
-      setError(data.error ?? 'Erreur lors de la sauvegarde')
+      const detail = data.details ? (Object.values(data.details).flat()[0] as string | undefined) : undefined
+      setError(detail ?? data.error ?? 'Erreur lors de la sauvegarde')
     } else {
-      setSuccess(true)
+      setSuccess({ siretVerifie: data.verificationSiret === 'ACTIF', avertissement: data.avertissement ?? null })
       router.refresh()
     }
     setLoading(false)
@@ -63,7 +64,13 @@ export function ProfilCommissionnaireForm({ profil }: Props) {
       </div>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {success && <p className="text-green-600 text-sm">Profil mis à jour avec succès !</p>}
+      {success && (
+        <div className="text-sm space-y-1" role="status">
+          <p className="text-green-600">Profil mis à jour avec succès !</p>
+          {success.siretVerifie && <p className="text-blue-700">✅ SIRET vérifié auprès du répertoire officiel : le badge s'affiche sur votre profil.</p>}
+          {success.avertissement && <p className="text-amber-700">{success.avertissement}</p>}
+        </div>
+      )}
 
       <button
         type="submit" disabled={loading}

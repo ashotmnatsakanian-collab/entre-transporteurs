@@ -3,26 +3,34 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { db } from '@/lib/db'
+import { accueilPour } from '@/lib/routes'
+import { TYPE_VEHICULE_LABELS } from '@/types'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
 
-  if (session) {
-    if (session.user.role === 'TRANSPORTEUR') redirect('/transporteur')
-    else redirect('/commissionnaire')
+  if (session) redirect(accueilPour(session.user.role))
+
+  const valide = {
+    active: true,
+    transporteur: { user: { suspendu: false, supprimeLe: null } },
+    OR: [
+      { dateDisponibiliteFin: { gte: new Date() } },
+      { AND: [{ dateDisponibiliteFin: null }, { dateDisponibilite: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
+    ],
   }
 
+  // Aperçu public : ni nom d'entreprise ni contact — seulement le trajet, la date et le véhicule
+  const apercu = await db.annonce.findMany({
+    where: valide,
+    orderBy: { createdAt: 'desc' },
+    take: 6,
+    select: { id: true, villeDepart: true, villeArrivee: true, dateDisponibilite: true, vehicule: { select: { type: true, chargeUtile: true } } },
+  })
+
   const [nbTransporteurs, nbAnnoncesActives, nbCommissionnaires] = await Promise.all([
-    db.transporteurProfil.count(),
-    db.annonce.count({
-      where: {
-        active: true,
-        OR: [
-          { dateDisponibiliteFin: { gte: new Date() } },
-          { AND: [{ dateDisponibiliteFin: null }, { dateDisponibilite: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
-        ],
-      },
-    }),
+    db.transporteurProfil.count({ where: { user: { suspendu: false, supprimeLe: null } } }),
+    db.annonce.count({ where: valide }),
     db.commissionnaireProfil.count(),
   ])
 
@@ -90,6 +98,31 @@ export default async function Home() {
         )}
       </section>
 
+      {/* Aperçu en direct */}
+      {apercu.length > 0 && (
+        <section className="max-w-5xl mx-auto px-6 pb-14">
+          <h2 className="text-lg font-semibold text-center text-slate-800 mb-1">Disponibles en ce moment</h2>
+          <p className="text-sm text-center text-slate-500 mb-6">Des transporteurs viennent de publier ces disponibilités.</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {apercu.map((a) => (
+              <div key={a.id} className="border border-slate-200 rounded-xl p-4 bg-white">
+                <div className="font-medium text-slate-800">📍 {a.villeDepart} → {a.villeArrivee ?? 'Toutes directions'}</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Dès le {a.dateDisponibilite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                  {a.vehicule && ` · ${TYPE_VEHICULE_LABELS[a.vehicule.type]} · ${a.vehicule.chargeUtile.toLocaleString('fr-FR')} kg`}
+                </div>
+                <div className="text-xs text-slate-400 mt-3">🔒 Créez un compte pour contacter ce transporteur</div>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Link href="/register?role=COMMISSIONNAIRE" className="text-brand-600 font-medium hover:underline text-sm">
+              Voir toutes les disponibilités →
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Comment ça marche */}
       <section className="bg-slate-50 py-16">
         <div className="max-w-5xl mx-auto px-6">
@@ -110,7 +143,7 @@ export default async function Home() {
               <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
                 <li>Recherchez par zone, véhicule, date ou destination</li>
                 <li>Consultez les avis et le profil vérifié du transporteur</li>
-                <li>Contactez-le en un clic, essai gratuit 30 jours</li>
+                <li>Contactez-le en un clic, gratuitement pendant le lancement</li>
               </ol>
             </div>
           </div>
@@ -137,16 +170,21 @@ export default async function Home() {
       {/* CTA final */}
       <section className="bg-gradient-to-br from-brand-900 to-brand-600 py-16 text-center">
         <h2 className="text-2xl font-bold text-white">Prêt à commencer ?</h2>
-        <p className="text-brand-100 mt-2">Gratuit pour les transporteurs · 69€/mois pour les commissionnaires, essai 30 jours</p>
+        <p className="text-brand-100 mt-2">Gratuit pour les transporteurs, toujours · Accès gratuit pour les commissionnaires pendant le lancement</p>
         <Link href="/abonnement/tarification"
           className="inline-block mt-6 bg-white text-brand-700 px-6 py-3 rounded-xl font-semibold hover:bg-brand-50 transition-colors"
         >
-          Voir les tarifs
+          Voir les conditions
         </Link>
       </section>
 
-      <footer className="text-center py-6 text-xs text-slate-400">
-        🚛 Entre Transporteurs — Bourse de fret géolocalisée
+      <footer className="text-center py-8 text-xs text-slate-400 space-y-2">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
+          <Link href="/cgu" className="hover:text-slate-600">Conditions d'utilisation</Link>
+          <Link href="/confidentialite" className="hover:text-slate-600">Confidentialité</Link>
+          <Link href="/mentions-legales" className="hover:text-slate-600">Mentions légales</Link>
+        </div>
+        <div>🚛 Entre Transporteurs — Bourse de fret géolocalisée</div>
       </footer>
     </div>
   )

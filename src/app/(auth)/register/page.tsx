@@ -14,6 +14,7 @@ function RegisterForm() {
   const [form, setForm] = useState({ email: '', password: '', nom: '', telephone: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [cgu, setCgu] = useState(false)
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -27,12 +28,13 @@ function RegisterForm() {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, role }),
+      body: JSON.stringify({ ...form, role, cgu }),
     })
 
     if (!res.ok) {
       const data = await res.json()
-      setError(data.error ?? 'Erreur lors de l\'inscription')
+      const detail = data.details ? (Object.values(data.details).flat()[0] as string | undefined) : undefined
+      setError(detail ?? data.error ?? 'Erreur lors de l\'inscription')
       setLoading(false)
       return
     }
@@ -47,8 +49,8 @@ function RegisterForm() {
       <h1 className="text-2xl font-bold text-slate-800 mb-2">Créer un compte</h1>
       <p className="text-slate-500 text-sm mb-6">
         {role === 'TRANSPORTEUR'
-          ? 'Gratuit pour toujours — aucune carte requise'
-          : "1 mois d'essai gratuit, puis 69 €/mois — aucune carte requise aujourd'hui"}
+          ? 'Gratuit pour toujours — aucune carte bancaire requise'
+          : 'Gratuit pendant le lancement — aucune carte bancaire requise'}
       </p>
 
       {/* Choix du rôle */}
@@ -114,13 +116,20 @@ function RegisterForm() {
             placeholder="8 caractères min, 1 majuscule, 1 chiffre"
           />
         </div>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <label className="flex items-start gap-2 text-xs text-slate-600">
+          <input type="checkbox" checked={cgu} onChange={(e) => setCgu(e.target.checked)} required className="mt-0.5" />
+          <span>
+            J'accepte les <Link href="/cgu" target="_blank" className="text-brand-600 underline">conditions d'utilisation</Link> et la{' '}
+            <Link href="/confidentialite" target="_blank" className="text-brand-600 underline">politique de confidentialité</Link>.
+          </span>
+        </label>
+        {error && <p className="text-red-600 text-sm" role="alert">{error}</p>}
         <button
           type="submit"
           disabled={loading}
           className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-lg transition-colors"
         >
-          {loading ? 'Création…' : role === 'TRANSPORTEUR' ? 'Créer mon compte gratuit' : 'Démarrer mon essai gratuit'}
+          {loading ? 'Création…' : 'Créer mon compte gratuit'}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-600">

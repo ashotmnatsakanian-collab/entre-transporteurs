@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import { io } from 'socket.io-client'
 
 export function BadgeNonLus({ userId }: { userId: string }) {
   const [count, setCount] = useState(0)
-  const { data: session } = useSession()
 
   useEffect(() => {
     function chargerCompteur() {
@@ -24,11 +22,11 @@ export function BadgeNonLus({ userId }: { userId: string }) {
     // message lui arrive, peu importe la page où il se trouve — on ré-interroge
     // le total plutôt que d'incrémenter en local pour rester exact (un message
     // reçu pendant que la conversation est déjà ouverte est aussitôt marqué lu).
-    const socket = io({ path: '/api/socket', auth: { userId: session?.user.id } })
+    const socket = io({ path: '/api/socket' })
     socket.on('unread-message', chargerCompteur)
 
     return () => { socket.disconnect() }
-  }, [userId, session])
+  }, [userId])
 
   if (count === 0) return null
 

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { io, Socket } from 'socket.io-client'
-import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import type { TypeVehicule } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS } from '@/types'
@@ -22,7 +21,7 @@ interface Transporteur {
   verifie?: boolean
   note_moyenne?: number | null
   nb_avis?: number
-  user: { id: string; nom: string; telephone: string | null; email: string }
+  user: { id: string; nom: string; telephone: string | null }
   vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number }>
   distance_km?: number
 }
@@ -40,12 +39,11 @@ function RecenterMap({ center }: { center: [number, number] }) {
 }
 
 export default function CarteInteractive({ transporteurs: initial, currentUserId, height = '100%' }: Props) {
-  const { data: session } = useSession()
   const [transporteurs, setTransporteurs] = useState<Transporteur[]>(initial)
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    const socket = io({ path: '/api/socket', auth: { userId: session?.user.id } })
+    const socket = io({ path: '/api/socket' })
     socketRef.current = socket
     socket.emit('join-carte')
 
@@ -54,7 +52,7 @@ export default function CarteInteractive({ transporteurs: initial, currentUserId
     })
 
     return () => { socket.disconnect() }
-  }, [session])
+  }, [])
 
   return (
     <div style={{ height }} className="w-full">
@@ -74,7 +72,7 @@ export default function CarteInteractive({ transporteurs: initial, currentUserId
             center={[t.latitude, t.longitude]}
             radius={8}
             pathOptions={{
-              fillColor: t.disponible ? '#22c55e' : '#f87171',
+              fillColor: t.disponible ? '#22c55e' : '#94a3b8',
               fillOpacity: 0.9,
               color: 'white',
               weight: 2,
@@ -83,7 +81,7 @@ export default function CarteInteractive({ transporteurs: initial, currentUserId
             <Popup maxWidth={280}>
               <div className="p-1 min-w-[200px]">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className={`w-2.5 h-2.5 rounded-full inline-block ${t.disponible ? 'bg-green-500' : 'bg-red-400'}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full inline-block ${t.disponible ? 'bg-green-500' : 'bg-slate-400'}`} />
                   <strong className="text-slate-800">{t.raisonSociale}</strong>
                   {t.verifie && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">✅</span>}
                 </div>

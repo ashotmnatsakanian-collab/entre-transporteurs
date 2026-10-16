@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 // Activé uniquement sur une instance de démonstration (NEXT_PUBLIC_DEMO_MODE=true au build).
@@ -14,8 +14,16 @@ const COMPTES_DEMO = [
   { label: '📋 Essayer en tant que commissionnaire', email: 'francois@tlf-paris.fr' },
 ]
 
-export default function LoginPage() {
+// Redirection post-connexion : uniquement un chemin interne (jamais d'URL externe → pas de "open redirect")
+function destinationSure(valeur: string | null): string {
+  if (valeur && valeur.startsWith('/') && !valeur.startsWith('//') && !valeur.includes('\\')) return valeur
+  return '/'
+}
+
+function LoginForm() {
   const router = useRouter()
+  const params = useSearchParams()
+  const sessionExpiree = params.get('session') === 'expiree'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -31,11 +39,14 @@ export default function LoginPage() {
       redirect: false,
     })
 
-    if (res?.error) {
+    if (res?.error === 'TROP_DE_TENTATIVES') {
+      setLoading(false)
+      setError('Trop de tentatives. Réessayez dans quelques minutes ou réinitialisez votre mot de passe.')
+    } else if (res?.error) {
       setLoading(false)
       setError('Email ou mot de passe incorrect.')
     } else {
-      router.push('/')
+      router.push(destinationSure(params.get('redirection')))
       router.refresh()
     }
   }
@@ -48,6 +59,11 @@ export default function LoginPage() {
   return (
     <>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Connexion</h1>
+      {sessionExpiree && (
+        <p className="mb-4 text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+          Votre session a pris fin. Reconnectez-vous.
+        </p>
+      )}
 
       {MODE_DEMO && (
         <div className="mb-6 space-y-2">
@@ -92,7 +108,12 @@ export default function LoginPage() {
             placeholder="••••••••"
           />
         </div>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-red-600 text-sm" role="alert">{error}</p>}
+        <div className="text-right -mt-2">
+          <Link href="/mot-de-passe-oublie" className="text-xs text-slate-500 hover:text-brand-600 hover:underline">
+            Mot de passe oublié ?
+          </Link>
+        </div>
         <button
           type="submit"
           disabled={loading}
@@ -108,5 +129,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

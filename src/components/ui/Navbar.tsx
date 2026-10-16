@@ -13,12 +13,15 @@ export function Navbar({ user }: NavbarProps) {
     <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-4 shrink-0">
       <span className="font-bold text-brand-700 hidden sm:block">🚛 Entre Transporteurs</span>
       <div className="flex-1" />
-      <Link href="/messages" className="relative p-2 hover:bg-slate-100 rounded-lg">
-        <span className="text-xl">💬</span>
-        <BadgeNonLus userId={user.id} />
-      </Link>
+      {user.role !== 'ADMIN' && (
+        <Link href="/messages" className="relative p-2 hover:bg-slate-100 rounded-lg" aria-label="Messages">
+          <span className="text-xl">💬</span>
+          <BadgeNonLus userId={user.id} />
+        </Link>
+      )}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-slate-600 hidden sm:block">{user.nom}</span>
+        <Link href="/compte" className="text-sm text-slate-600 hover:text-slate-900 hidden sm:block" title="Mon compte">{user.nom}</Link>
+        <Link href="/compte" className="sm:hidden p-2 hover:bg-slate-100 rounded-lg" aria-label="Mon compte">👤</Link>
         <button
           onClick={() => signOut({ callbackUrl: '/' })}
           className="text-sm text-slate-500 hover:text-slate-800 px-2 py-1 hover:bg-slate-100 rounded"
