@@ -61,7 +61,8 @@ export const rechercheBesoinSchema = z.object({
 })
 
 export const adminUtilisateurSchema = z.object({
-  verifie: z.boolean().optional(),
+  // Le badge « SIRET vérifié » résulte uniquement de la vérification officielle : l'admin ne peut que le retirer
+  verifie: z.literal(false).optional(),
   suspendu: z.boolean().optional(),
 })
 

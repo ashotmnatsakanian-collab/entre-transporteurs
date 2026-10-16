@@ -53,11 +53,12 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
               {a.raisonSociale}
             </Link>
             {a.verifie && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">✅ Vérifié</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700" title="Établissement existant et en activité au répertoire officiel">✅ SIRET vérifié</span>
             )}
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${a.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-500'}`}>
-              {a.disponible ? 'Disponible' : 'Indisponible'}
-            </span>
+            {/* Une annonce publiée = une disponibilité datée ; le badge ne signale que le « disponible maintenant » */}
+            {a.disponible && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">🟢 Disponible maintenant</span>
+            )}
             <span className="text-xs text-slate-400">📍 {a.distance_km} km</span>
             <BadgeNote moyenne={a.note_moyenne} total={a.nb_avis} />
           </div>
@@ -229,10 +230,10 @@ export function RechercheAnnoncesClient() {
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {erreur && <p className="text-red-600 text-sm text-center pt-4">{erreur}</p>}
         {loading && resultats.length === 0 && !erreur && (
-          <p className="text-slate-400 text-sm text-center pt-16">Chargement des annonces…</p>
+          <p className="text-slate-400 text-sm text-center pt-16">Chargement des disponibilités…</p>
         )}
         {!loading && rechercheFaite && resultats.length === 0 && !erreur && (
-          <p className="text-slate-400 text-sm text-center pt-16">Aucune annonce pour ces critères. Élargissez le rayon ou la date.</p>
+          <p className="text-slate-400 text-sm text-center pt-16">Aucune disponibilité pour ces critères. Élargissez le rayon ou la date.</p>
         )}
         {resultats.map((a) => (
           <CarteAnnonce key={a.id} a={a} nouvelle={nouvellesIds.has(a.id)} />

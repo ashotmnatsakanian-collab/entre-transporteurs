@@ -75,21 +75,20 @@ export default async function DashboardTransporteurPage() {
       )}
 
       {/* Stats rapides */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard label="Véhicules actifs" value={profil?.vehicules.length ?? 0} icon="🚚" />
-        <StatCard label="Annonces actives" value={nbAnnoncesActives} icon="📣" href="/transporteur/annonces" />
+        <StatCard label="Disponibilités publiées" value={nbAnnoncesActives} icon="📣" href="/transporteur/annonces" />
         <StatCard
           label="Note"
           value={agregatAvis?._count ? <BadgeNote moyenne={agregatAvis._avg.note} total={agregatAvis._count} /> : 'Aucun avis'}
           icon="⭐"
         />
         <StatCard
-          label="SIRET"
+          label="Badge SIRET"
           value={profil?.siretVerifieLe ? 'Vérifié ✅' : profil?.siret ? 'Non vérifié' : 'À renseigner'}
           icon="🏢"
           href="/transporteur/profil"
         />
-        <StatCard label="Disponible maintenant" value={profil?.disponible ? 'Oui' : 'Non'} icon={profil?.disponible ? '🟢' : '⚪'} />
       </div>
 
       {/* Flotte */}

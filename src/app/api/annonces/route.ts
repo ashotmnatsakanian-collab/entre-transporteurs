@@ -42,7 +42,7 @@ export const GET = gerer(async (req) => {
   return json(await rechercherAnnoncesParRayon({ lat: q.lat, lng: q.lng, rayonKm: q.rayonKm, date: q.date, villeArrivee: q.villeArrivee }))
 })
 
-// POST /api/annonces — publier une disponibilité (transporteur, toujours gratuit)
+// POST /api/annonces — publier une disponibilité (transporteur, gratuit)
 export const POST = gerer(async (req) => {
   const u = await exigerUtilisateur('TRANSPORTEUR')
   exigerEmailVerifie(u)

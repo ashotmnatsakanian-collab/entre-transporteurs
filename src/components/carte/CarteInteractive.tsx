@@ -83,7 +83,7 @@ export default function CarteInteractive({ transporteurs: initial, currentUserId
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className={`w-2.5 h-2.5 rounded-full inline-block ${t.disponible ? 'bg-green-500' : 'bg-slate-400'}`} />
                   <strong className="text-slate-800">{t.raisonSociale}</strong>
-                  {t.verifie && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">✅</span>}
+                  {t.verifie && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full" title="Établissement existant et en activité au répertoire officiel">✅ SIRET vérifié</span>}
                 </div>
                 <div className="mb-2">
                   <BadgeNote moyenne={t.note_moyenne ?? null} total={t.nb_avis ?? 0} />

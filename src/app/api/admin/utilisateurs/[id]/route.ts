@@ -4,7 +4,7 @@ import { journaliser } from '@/lib/journal'
 import { ipClient } from '@/lib/ip'
 import { ApiError, exigerUtilisateur, gerer, json, lireJson } from '@/lib/api'
 
-// PATCH /api/admin/utilisateurs/[id] — valider le badge ou suspendre un compte
+// PATCH /api/admin/utilisateurs/[id] — retirer le badge « SIRET vérifié » ou suspendre un compte (le badge ne s'accorde pas à la main)
 export const PATCH = gerer<{ params: Promise<{ id: string }> }>(async (req, { params }) => {
   const { id } = await params
   const admin = await exigerUtilisateur('ADMIN')

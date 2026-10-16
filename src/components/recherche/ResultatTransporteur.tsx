@@ -47,10 +47,10 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
               {t.raisonSociale}
             </Link>
             {t.verifie && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">✅ Vérifié</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700" title="Établissement existant et en activité au répertoire officiel">✅ SIRET vérifié</span>
             )}
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-500'}`}>
-              {t.disponible ? 'Disponible' : 'Indisponible'}
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.disponible ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+              {t.disponible ? '🟢 Disponible maintenant' : 'Pas disponible maintenant'}
             </span>
             <span className="text-xs text-slate-400">📍 {t.distance_km} km</span>
             <BadgeNote moyenne={t.note_moyenne} total={t.nb_avis} />

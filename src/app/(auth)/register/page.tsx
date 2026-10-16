@@ -49,7 +49,7 @@ function RegisterForm() {
       <h1 className="text-2xl font-bold text-slate-800 mb-2">Créer un compte</h1>
       <p className="text-slate-500 text-sm mb-6">
         {role === 'TRANSPORTEUR'
-          ? 'Gratuit pour toujours — aucune carte bancaire requise'
+          ? 'Gratuit — aucune carte bancaire requise'
           : 'Gratuit pendant le lancement — aucune carte bancaire requise'}
       </p>
 

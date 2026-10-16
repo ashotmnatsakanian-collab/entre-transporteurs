@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { db } from '@/lib/db'
 import { accueilPour } from '@/lib/routes'
 import { TYPE_VEHICULE_LABELS } from '@/types'
+import { EDITEUR } from '@/lib/legal'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -88,7 +89,7 @@ export default async function Home() {
             </div>
             <div>
               <div className="text-2xl font-bold text-slate-900">{nbAnnoncesActives}</div>
-              <div className="text-xs text-slate-500">annonce{nbAnnoncesActives > 1 ? 's' : ''} active{nbAnnoncesActives > 1 ? 's' : ''} en ce moment</div>
+              <div className="text-xs text-slate-500">disponibilité{nbAnnoncesActives > 1 ? 's' : ''} en ce moment</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-slate-900">{nbCommissionnaires}</div>
@@ -142,7 +143,7 @@ export default async function Home() {
               <h3 className="font-semibold text-slate-800 mb-3">Vous êtes commissionnaire</h3>
               <ol className="space-y-2 text-sm text-slate-600 list-decimal list-inside">
                 <li>Recherchez par zone, véhicule, date ou destination</li>
-                <li>Consultez les avis et le profil vérifié du transporteur</li>
+                <li>Consultez le profil, le badge SIRET et les avis du transporteur</li>
                 <li>Contactez-le en un clic, gratuitement pendant le lancement</li>
               </ol>
             </div>
@@ -156,7 +157,7 @@ export default async function Home() {
           {[
             { icon: '📣', label: 'Annonces en temps réel', desc: 'Trajets retour publiés instantanément' },
             { icon: '🗺️', label: 'Carte interactive', desc: 'Visualisez les disponibilités près de vous' },
-            { icon: '⭐', label: 'Avis vérifiés', desc: 'La confiance entre professionnels' },
+            { icon: '⭐', label: 'Avis entre professionnels', desc: 'Notés uniquement après un échange réel' },
           ].map((f) => (
             <div key={f.label}>
               <div className="text-3xl mb-2">{f.icon}</div>
@@ -170,7 +171,7 @@ export default async function Home() {
       {/* CTA final */}
       <section className="bg-gradient-to-br from-brand-900 to-brand-600 py-16 text-center">
         <h2 className="text-2xl font-bold text-white">Prêt à commencer ?</h2>
-        <p className="text-brand-100 mt-2">Gratuit pour les transporteurs, toujours · Accès gratuit pour les commissionnaires pendant le lancement</p>
+        <p className="text-brand-100 mt-2">Gratuit pour les transporteurs · Accès gratuit pour les commissionnaires pendant le lancement</p>
         <Link href="/abonnement/tarification"
           className="inline-block mt-6 bg-white text-brand-700 px-6 py-3 rounded-xl font-semibold hover:bg-brand-50 transition-colors"
         >
@@ -180,9 +181,11 @@ export default async function Home() {
 
       <footer className="text-center py-8 text-xs text-slate-400 space-y-2">
         <div className="flex flex-wrap justify-center gap-x-5 gap-y-1">
+          <Link href="/abonnement/tarification" className="hover:text-slate-600">Tarifs</Link>
           <Link href="/cgu" className="hover:text-slate-600">Conditions d'utilisation</Link>
           <Link href="/confidentialite" className="hover:text-slate-600">Confidentialité</Link>
           <Link href="/mentions-legales" className="hover:text-slate-600">Mentions légales</Link>
+          {!EDITEUR.email.startsWith('[') && <a href={`mailto:${EDITEUR.email}`} className="hover:text-slate-600">Contact</a>}
         </div>
         <div>🚛 Entre Transporteurs — Bourse de fret géolocalisée</div>
       </footer>
