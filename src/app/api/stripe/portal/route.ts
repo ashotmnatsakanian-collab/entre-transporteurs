@@ -1,26 +1,20 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { stripe } from '@/lib/stripe'
+import { urlApplication } from '@/lib/email'
+import { ApiError, exigerUtilisateur, gerer, json, limiter } from '@/lib/api'
 
-export async function POST() {
-  if (!stripe) {
-    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 501 })
-  }
+// POST /api/stripe/portal — gérer / résilier son abonnement
+export const POST = gerer(async (req) => {
+  if (!stripe) throw new ApiError(501, 'Le paiement en ligne est désactivé pendant la période de lancement.')
+  const u = await exigerUtilisateur('COMMISSIONNAIRE')
+  limiter(req, 'portail', 10, 60 * 60_000, u.id)
 
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  const abo = await db.abonnement.findUnique({ where: { userId: u.id } })
+  if (!abo?.stripeCustomerId) throw new ApiError(404, 'Aucun abonnement Stripe trouvé')
 
-  const abo = await db.abonnement.findUnique({ where: { userId: session.user.id } })
-  if (!abo?.stripeCustomerId) {
-    return NextResponse.json({ error: 'Aucun abonnement Stripe trouvé' }, { status: 404 })
-  }
-
-  const portalSession = await stripe.billingPortal.sessions.create({
+  const portail = await stripe.billingPortal.sessions.create({
     customer: abo.stripeCustomerId,
-    return_url: `${process.env.NEXTAUTH_URL}/transporteur`,
+    return_url: urlApplication('/commissionnaire'),
   })
-
-  return NextResponse.json({ url: portalSession.url })
-}
+  return json({ url: portail.url })
+})

@@ -1,45 +1,34 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { stripe } from '@/lib/stripe'
+import { urlApplication } from '@/lib/email'
+import { ApiError, exigerUtilisateur, gerer, json, limiter } from '@/lib/api'
 
-export async function POST() {
-  if (!stripe) {
-    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 501 })
-  }
+// POST /api/stripe/checkout — souscrire (commissionnaires uniquement)
+export const POST = gerer(async (req) => {
+  if (!stripe || !process.env.STRIPE_PRICE_ID) throw new ApiError(501, 'Le paiement en ligne est désactivé pendant la période de lancement.')
+  const u = await exigerUtilisateur('COMMISSIONNAIRE')
+  limiter(req, 'checkout', 10, 60 * 60_000, u.id)
 
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-
-  const abo = await db.abonnement.findUnique({ where: { userId: session.user.id } })
-  if (!abo) return NextResponse.json({ error: 'Abonnement introuvable' }, { status: 404 })
-
-  if (abo.statut === 'ACTIVE') {
-    return NextResponse.json({ error: 'Déjà abonné' }, { status: 409 })
-  }
+  const abo = await db.abonnement.findUnique({ where: { userId: u.id } })
+  if (!abo) throw new ApiError(404, 'Abonnement introuvable')
+  if (abo.statut === 'ACTIVE') throw new ApiError(409, 'Déjà abonné')
 
   let customerId = abo.stripeCustomerId
   if (!customerId) {
-    const user = await db.user.findUnique({ where: { id: session.user.id } })
-    const customer = await stripe.customers.create({ email: user!.email, name: user!.nom })
+    const customer = await stripe.customers.create({ email: u.email, name: u.nom })
     customerId = customer.id
-    await db.abonnement.update({
-      where: { userId: session.user.id },
-      data: { stripeCustomerId: customerId },
-    })
+    await db.abonnement.update({ where: { userId: u.id }, data: { stripeCustomerId: customerId } })
   }
 
-  const checkoutSession = await stripe.checkout.sessions.create({
+  const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
-    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
-    success_url: `${process.env.NEXTAUTH_URL}/abonnement/succes?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXTAUTH_URL}/abonnement/tarification`,
+    line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+    success_url: urlApplication('/abonnement/succes?session_id={CHECKOUT_SESSION_ID}'),
+    cancel_url: urlApplication('/abonnement/tarification'),
     allow_promotion_codes: true,
-    metadata: { userId: session.user.id },
+    metadata: { userId: u.id },
   })
-
-  return NextResponse.json({ url: checkoutSession.url })
-}
+  return json({ url: session.url })
+})

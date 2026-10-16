@@ -9,6 +9,8 @@ declare module 'next-auth' {
       email: string
       nom: string
       role: Role
+      // horodatage (ms) de l'ouverture de session — sert à révoquer les sessions anciennes
+      connecteLe: number
     }
   }
 
@@ -17,6 +19,7 @@ declare module 'next-auth' {
     email: string
     nom: string
     role: Role
+    connecteLe?: number
   }
 }
 

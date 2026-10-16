@@ -15,7 +15,6 @@ export interface RowTransporteurGeo {
   distance_km: number
   nom: string
   telephone: string | null
-  email: string
   verifie: boolean
   note_moyenne: number | null
   nb_avis: number
@@ -44,8 +43,6 @@ export async function rechercherParRayon(
       tp.disponible,
       tp."derniereMAJ",
       u.nom,
-      u.telephone,
-      u.email,
       u.verifie,
       av.note_moyenne,
       COALESCE(av.nb_avis, 0)::int AS nb_avis,
@@ -94,7 +91,6 @@ export interface RowAnnonceGeo {
   raisonSociale: string
   disponible: boolean
   nom: string
-  telephone: string | null
   verifie: boolean
   note_moyenne: number | null
   nb_avis: number
@@ -124,7 +120,6 @@ export async function recupererAnnonceDiffusion(id: string): Promise<RowAnnonceD
       tp."raisonSociale",
       tp.disponible,
       u.nom,
-      u.telephone,
       u.verifie,
       av.note_moyenne,
       COALESCE(av.nb_avis, 0)::int AS nb_avis,
@@ -178,7 +173,6 @@ export async function rechercherAnnoncesParRayon(params: {
       tp."raisonSociale",
       tp.disponible,
       u.nom,
-      u.telephone,
       u.verifie,
       av.note_moyenne,
       COALESCE(av.nb_avis, 0)::int AS nb_avis,
@@ -217,4 +211,73 @@ export async function rechercherAnnoncesParRayon(params: {
     ORDER BY a."dateDisponibilite" ASC, distance_km ASC
     LIMIT 200
   `)
+}
+
+export interface RowBesoinGeo {
+  id: string
+  userId: string
+  commissionnaireId: string
+  raisonSociale: string
+  verifie: boolean
+  villeDepart: string
+  latDepart: number
+  lngDepart: number
+  villeArrivee: string
+  dateEnlevement: Date
+  typeVehicule: string | null
+  poidsKg: number | null
+  description: string | null
+  distance_km: number
+}
+
+/** Besoins de transport actifs dont le départ est dans le rayon (vue transporteur). */
+export async function rechercherBesoinsParRayon(lat: number, lng: number, rayonKm: number): Promise<RowBesoinGeo[]> {
+  return db.$queryRaw<RowBesoinGeo[]>(Prisma.sql`
+    SELECT
+      b.id,
+      cp."userId",
+      b."commissionnaireId",
+      cp."raisonSociale",
+      u.verifie,
+      b."villeDepart",
+      b."latDepart",
+      b."lngDepart",
+      b."villeArrivee",
+      b."dateEnlevement",
+      b."typeVehicule",
+      b."poidsKg",
+      b.description,
+      ROUND(CAST(6371 * acos(LEAST(1.0,
+        cos(radians(${lat})) * cos(radians(b."latDepart"))
+        * cos(radians(b."lngDepart") - radians(${lng}))
+        + sin(radians(${lat})) * sin(radians(b."latDepart")))) AS NUMERIC), 1) AS distance_km
+    FROM "Besoin" b
+    JOIN "CommissionnaireProfil" cp ON cp.id = b."commissionnaireId"
+    JOIN "User" u ON u.id = cp."userId"
+    WHERE b.active
+      AND NOT u.suspendu AND u."supprimeLe" IS NULL
+      AND b."dateEnlevement" >= NOW() - INTERVAL '1 day'
+      AND 6371 * acos(LEAST(1.0,
+        cos(radians(${lat})) * cos(radians(b."latDepart"))
+        * cos(radians(b."lngDepart") - radians(${lng}))
+        + sin(radians(${lat})) * sin(radians(b."latDepart")))) <= ${rayonKm}
+    ORDER BY b."dateEnlevement" ASC, distance_km ASC
+    LIMIT 200
+  `)
+}
+
+export type RowBesoinDiffusion = Omit<RowBesoinGeo, 'distance_km'>
+
+export async function recupererBesoinDiffusion(id: string): Promise<RowBesoinDiffusion | null> {
+  const rows = await db.$queryRaw<RowBesoinDiffusion[]>(Prisma.sql`
+    SELECT b.id, cp."userId", b."commissionnaireId", cp."raisonSociale", u.verifie,
+      b."villeDepart", b."latDepart", b."lngDepart", b."villeArrivee", b."dateEnlevement",
+      b."typeVehicule", b."poidsKg", b.description
+    FROM "Besoin" b
+    JOIN "CommissionnaireProfil" cp ON cp.id = b."commissionnaireId"
+    JOIN "User" u ON u.id = cp."userId"
+    WHERE b.id = ${id}
+    LIMIT 1
+  `)
+  return rows[0] ?? null
 }

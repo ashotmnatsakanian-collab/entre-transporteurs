@@ -1,22 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { db } from '@/lib/db'
+import { ApiError, gerer, json } from '@/lib/api'
+import { log, messageErreur } from '@/lib/logger'
 
-export async function POST(req: NextRequest) {
-  if (!stripe) {
-    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 501 })
-  }
+// POST /api/stripe/webhook — appelé par Stripe uniquement (signature vérifiée, corps brut)
+export const POST = gerer(async (req) => {
+  if (!stripe || !process.env.STRIPE_WEBHOOK_SECRET) throw new ApiError(501, 'Stripe non configuré')
 
   const body = await req.text()
-  const sig = req.headers.get('stripe-signature')!
+  const sig = req.headers.get('stripe-signature')
+  if (!sig) throw new ApiError(400, 'Signature manquante')
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
-    console.error('[webhook] Signature invalide', err)
-    return NextResponse.json({ error: 'Signature invalide' }, { status: 400 })
+    log.warn('webhook Stripe : signature invalide', { erreur: messageErreur(err) })
+    throw new ApiError(400, 'Signature invalide')
   }
 
   try {
@@ -67,12 +68,12 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (err) {
-    console.error('[webhook]', event.type, err)
-    return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
+    log.error('webhook Stripe : traitement échoué', { type: event.type, erreur: messageErreur(err) })
+    throw new ApiError(500, 'Erreur interne') // Stripe réessaiera
   }
 
-  return NextResponse.json({ received: true })
-}
+  return json({ received: true })
+})
 
 function stripeStatutVersLocal(statut: Stripe.Subscription.Status): 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' {
   switch (statut) {

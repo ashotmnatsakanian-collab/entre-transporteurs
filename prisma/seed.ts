@@ -82,6 +82,10 @@ const COMMISSIONNAIRES = [
 ]
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && !process.argv.includes('--force-production')) {
+    console.error('⛔ Le seed crée de faux comptes publics (mot de passe connu). Refusé en production.')
+    process.exit(1)
+  }
   console.log('🌱 Début du seed...')
   const mdp = await hash(MOT_DE_PASSE, 12)
   const trial = addDays(new Date(), 30)
@@ -98,6 +102,8 @@ async function main() {
         telephone: t.tel,
         role: Role.TRANSPORTEUR,
         verifie: true,
+        emailVerifieLe: new Date(),
+        cguAccepteesLe: new Date(),
         // Les transporteurs sont gratuits — pas d'abonnement
         transporteurProfil: {
           create: {
@@ -207,6 +213,8 @@ async function main() {
         telephone: c.tel,
         role: Role.COMMISSIONNAIRE,
         verifie: true,
+        emailVerifieLe: new Date(),
+        cguAccepteesLe: new Date(),
         abonnement: {
           create: {
             statut: StatutAbonnement.TRIALING,
@@ -224,26 +232,38 @@ async function main() {
     console.log(`  ✓ Commissionnaire : ${c.rs}`)
   }
 
+  // ── Besoins de transport de démonstration (dates relatives, rafraîchies à chaque seed) ──
+  const BESOINS = [
+    { email: 'francois@tlf-paris.fr', depart: 'Paris', lat: 48.8566, lng: 2.3522, arrivee: 'Marseille', jours: 1, type: TypeVehicule.SEMI, poids: 22000, description: '18 palettes d\'électroménager, quai à quai.' },
+    { email: 'isabelle@groupe-fret.fr', depart: 'Lyon', lat: 45.764, lng: 4.8357, arrivee: 'Paris', jours: 2, type: TypeVehicule.PORTEUR, poids: 8000, description: 'Produits frais, température dirigée +4°C.' },
+    { email: 'laurent@nexlog.fr', depart: 'Lille', lat: 50.6292, lng: 3.0573, arrivee: 'Rennes', jours: 3, type: null, poids: null, description: 'Fret palettisé, 12 palettes.' },
+    { email: 'nathalie@logipro.fr', depart: 'Bordeaux', lat: 44.8378, lng: -0.5792, arrivee: 'Nantes', jours: 1, type: TypeVehicule.FOURGON, poids: 1200, description: null },
+  ]
+  for (const b of BESOINS) {
+    const user = await db.user.findUnique({ where: { email: b.email }, include: { commissionnaireProfil: true } })
+    if (!user?.commissionnaireProfil) continue
+    const date = addDays(new Date(), b.jours)
+    const existant = await db.besoin.findFirst({ where: { commissionnaireId: user.commissionnaireProfil.id, villeDepart: b.depart, villeArrivee: b.arrivee } })
+    if (existant) await db.besoin.update({ where: { id: existant.id }, data: { dateEnlevement: date, active: true } })
+    else await db.besoin.create({ data: { commissionnaireId: user.commissionnaireProfil.id, villeDepart: b.depart, latDepart: b.lat, lngDepart: b.lng, villeArrivee: b.arrivee, dateEnlevement: date, typeVehicule: b.type, poidsKg: b.poids, description: b.description } })
+    console.log(`  ✓ Besoin : ${b.depart} → ${b.arrivee}`)
+  }
+
   // ── Conversations de démonstration ───────────────────────────────────────────
   const franco = await db.user.findUnique({ where: { email: 'francois@tlf-paris.fr' } })
   const jean = await db.user.findUnique({ where: { email: 'jean.dupont@dupont-transport.fr' } })
   const isabelle = await db.user.findUnique({ where: { email: 'isabelle@groupe-fret.fr' } })
   const marie = await db.user.findUnique({ where: { email: 'marie@brossard-logistique.fr' } })
 
+  const cleDePaire = (a: string, b: string) => [a, b].sort().join(':')
   async function trouverConversation(userIdA: string, userIdB: string) {
-    return db.conversation.findFirst({
-      where: {
-        AND: [
-          { participants: { some: { userId: userIdA } } },
-          { participants: { some: { userId: userIdB } } },
-        ],
-      },
-    })
+    return db.conversation.findUnique({ where: { cle: cleDePaire(userIdA, userIdB) } })
   }
 
   if (franco && jean && !(await trouverConversation(franco.id, jean.id))) {
     const conv1 = await db.conversation.create({
       data: {
+        cle: cleDePaire(franco.id, jean.id),
         participants: {
           create: [{ userId: franco.id }, { userId: jean.id }],
         },
@@ -262,6 +282,7 @@ async function main() {
   if (isabelle && marie && !(await trouverConversation(isabelle.id, marie.id))) {
     const conv2 = await db.conversation.create({
       data: {
+        cle: cleDePaire(isabelle.id, marie.id),
         participants: {
           create: [{ userId: isabelle.id }, { userId: marie.id }],
         },

@@ -1,29 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { profilCommissionnaireSchema } from '@/lib/validations/profil'
+import { appliquerVerificationSiret, messageStatutSiret } from '@/lib/profils'
+import { ApiError, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
-// PUT /api/commissionnaires — mettre à jour son propre profil commissionnaire
-export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (session.user.role !== 'COMMISSIONNAIRE') return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+// PUT /api/commissionnaires — mettre à jour son profil (et vérifier le SIRET auprès de l'État)
+export const PUT = gerer(async (req) => {
+  const u = await exigerUtilisateur('COMMISSIONNAIRE')
+  limiter(req, 'profil', 30, 60 * 60_000, u.id)
+  const data = await lireJson(req, profilCommissionnaireSchema)
 
-  try {
-    const body = await req.json()
-    const data = profilCommissionnaireSchema.parse(body)
+  const avant = await db.commissionnaireProfil.findUnique({ where: { userId: u.id }, select: { siret: true, siretVerifieLe: true } })
+  if (!avant) throw new ApiError(404, 'Profil introuvable')
 
-    const profil = await db.commissionnaireProfil.update({
-      where: { userId: session.user.id },
-      data,
-    })
-    return NextResponse.json(profil)
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'ZodError') {
-      return NextResponse.json({ error: 'Données invalides (le SIRET doit comporter 14 chiffres)', details: err }, { status: 400 })
-    }
-    console.error('[commissionnaires PUT]', err)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-}
+  await db.commissionnaireProfil.update({ where: { userId: u.id }, data })
+
+  const dejaVerifie = !!avant.siretVerifieLe && avant.siret === data.siret
+  const statut = dejaVerifie ? 'ACTIF' : await appliquerVerificationSiret(u.id, 'COMMISSIONNAIRE', data.siret, avant.siret || null)
+
+  return json({ success: true, verificationSiret: statut, avertissement: messageStatutSiret(statut) })
+})

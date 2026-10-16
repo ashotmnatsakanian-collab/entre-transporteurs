@@ -1,27 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { disponibiliteSchema } from '@/lib/validations/divers'
 import { getIO } from '@/lib/socket-server'
+import { exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
-// PATCH /api/transporteurs/disponibilite
-export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (session.user.role !== 'TRANSPORTEUR') return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+// PATCH /api/transporteurs/disponibilite — "disponible maintenant"
+export const PATCH = gerer(async (req) => {
+  const u = await exigerUtilisateur('TRANSPORTEUR')
+  limiter(req, 'disponibilite', 60, 60 * 60_000, u.id)
+  const { disponible } = await lireJson(req, disponibiliteSchema)
 
-  const { disponible } = await req.json() as { disponible: boolean }
+  const profil = await db.transporteurProfil.update({ where: { userId: u.id }, data: { disponible, derniereMAJ: new Date() } })
+  getIO()?.to('carte').emit('disponibilite-change', { userId: u.id, disponible })
 
-  const profil = await db.transporteurProfil.update({
-    where: { userId: session.user.id },
-    data: { disponible, derniereMAJ: new Date() },
-  })
-
-  // Diffuser en temps réel à tous les clients de la carte
-  const io = getIO()
-  if (io) {
-    io.emit('disponibilite-change', { userId: session.user.id, disponible })
-  }
-
-  return NextResponse.json({ disponible: profil.disponible })
-}
+  return json({ disponible: profil.disponible })
+})

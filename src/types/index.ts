@@ -124,3 +124,28 @@ export const SPECIFICITE_LABELS: Record<Specificite, string> = {
   DOUBLE_PLANCHER: 'Double plancher',
   VEHICULE_ACCOMPAGNE: 'Véhicule accompagné',
 }
+
+export interface BesoinAvecInfos {
+  id: string
+  villeDepart: string
+  villeArrivee: string
+  dateEnlevement: string
+  typeVehicule: TypeVehicule | null
+  poidsKg: number | null
+  description: string | null
+  active: boolean
+}
+
+export interface BesoinRecherche {
+  id: string
+  userId: string
+  raisonSociale: string
+  verifie: boolean
+  villeDepart: string
+  villeArrivee: string
+  dateEnlevement: string
+  typeVehicule: TypeVehicule | null
+  poidsKg: number | null
+  description: string | null
+  distance_km: number
+}

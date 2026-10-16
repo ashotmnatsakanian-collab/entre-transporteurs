@@ -1,43 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { annoncePatchSchema } from '@/lib/validations/annonce'
+import { ApiError, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
-async function trouverAnnoncePropre(id: string, userId: string) {
-  const annonce = await db.annonce.findUnique({
-    where: { id },
-    include: { transporteur: { select: { userId: true } } },
-  })
-  if (!annonce || annonce.transporteur.userId !== userId) return null
+async function annoncePropre(id: string, userId: string) {
+  const annonce = await db.annonce.findUnique({ where: { id }, select: { id: true, transporteur: { select: { userId: true } } } })
+  // 404 (et non 403) : on ne révèle pas l'existence d'une annonce d'autrui
+  if (!annonce || annonce.transporteur.userId !== userId) throw new ApiError(404, 'Annonce introuvable')
   return annonce
 }
 
-// PATCH /api/annonces/[id] — activer/désactiver (ex: trajet pourvu) sa propre annonce
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+type Ctx = { params: Promise<{ id: string }> }
+
+// PATCH /api/annonces/[id] — marquer pourvue / réactiver sa propre annonce
+export const PATCH = gerer<Ctx>(async (req, { params }) => {
   const { id } = await params
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  const u = await exigerUtilisateur('TRANSPORTEUR')
+  limiter(req, 'annonces-modif', 60, 60 * 60_000, u.id)
+  await annoncePropre(id, u.id)
+  const { active } = await lireJson(req, annoncePatchSchema)
+  return json(await db.annonce.update({ where: { id }, data: { active } }))
+})
 
-  const annonce = await trouverAnnoncePropre(id, session.user.id)
-  if (!annonce) return NextResponse.json({ error: 'Annonce introuvable' }, { status: 404 })
-
-  const body = await req.json() as { active?: boolean }
-  const maj = await db.annonce.update({
-    where: { id: id },
-    data: { ...(typeof body.active === 'boolean' && { active: body.active }) },
-  })
-  return NextResponse.json(maj)
-}
-
-// DELETE /api/annonces/[id] — supprimer sa propre annonce
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// DELETE /api/annonces/[id]
+export const DELETE = gerer<Ctx>(async (req, { params }) => {
   const { id } = await params
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-
-  const annonce = await trouverAnnoncePropre(id, session.user.id)
-  if (!annonce) return NextResponse.json({ error: 'Annonce introuvable' }, { status: 404 })
-
-  await db.annonce.delete({ where: { id: id } })
-  return NextResponse.json({ success: true })
-}
+  const u = await exigerUtilisateur('TRANSPORTEUR')
+  limiter(req, 'annonces-modif', 60, 60 * 60_000, u.id)
+  await annoncePropre(id, u.id)
+  await db.annonce.delete({ where: { id } })
+  return json({ success: true })
+})

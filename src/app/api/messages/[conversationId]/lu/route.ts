@@ -1,36 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getIO } from '@/lib/socket-server'
+import { ApiError, exigerUtilisateur, gerer, json } from '@/lib/api'
 
 // PATCH /api/messages/:conversationId/lu — marquer les messages reçus comme lus
-export async function PATCH(
-  _req: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
-) {
+export const PATCH = gerer<{ params: Promise<{ conversationId: string }> }>(async (_req, { params }) => {
   const { conversationId } = await params
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  const u = await exigerUtilisateur('TRANSPORTEUR', 'COMMISSIONNAIRE')
 
   const participant = await db.conversationParticipant.findUnique({
-    where: { conversationId_userId: { conversationId: conversationId, userId: session.user.id } },
+    where: { conversationId_userId: { conversationId, userId: u.id } },
+    select: { id: true },
   })
-  if (!participant) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
+  if (!participant) throw new ApiError(404, 'Conversation introuvable')
 
   const { count } = await db.message.updateMany({
-    where: {
-      conversationId: conversationId,
-      expediteurId: { not: session.user.id },
-      lu: false,
-    },
+    where: { conversationId, expediteurId: { not: u.id }, lu: false },
     data: { lu: true },
   })
+  // Prévenir l'expéditeur en direct (indicateur "· Lu")
+  if (count > 0) getIO()?.to(`conv:${conversationId}`).emit('messages-read', { conversationId })
 
-  // Prévenir l'expéditeur en direct que ses messages ont été lus (indicateur "· Lu")
-  if (count > 0) {
-    getIO()?.to(`conv:${conversationId}`).emit('messages-read', { conversationId: conversationId })
-  }
-
-  return NextResponse.json({ success: true })
-}
+  return json({ success: true })
+})

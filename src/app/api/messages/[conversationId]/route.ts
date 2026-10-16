@@ -1,33 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { ApiError, exigerUtilisateur, gerer, json } from '@/lib/api'
 
-async function participantValide(conversationId: string, userId: string): Promise<boolean> {
-  const p = await db.conversationParticipant.findUnique({
-    where: { conversationId_userId: { conversationId, userId } },
-  })
-  return !!p
-}
-
-// GET /api/messages/:conversationId — historique d'une conversation
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
-) {
+// GET /api/messages/:conversationId — derniers messages d'une conversation
+export const GET = gerer<{ params: Promise<{ conversationId: string }> }>(async (_req, { params }) => {
   const { conversationId } = await params
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+  const u = await exigerUtilisateur('TRANSPORTEUR', 'COMMISSIONNAIRE')
 
-  if (!(await participantValide(conversationId, session.user.id))) {
-    return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
-  }
+  const participant = await db.conversationParticipant.findUnique({
+    where: { conversationId_userId: { conversationId, userId: u.id } },
+    select: { id: true },
+  })
+  if (!participant) throw new ApiError(404, 'Conversation introuvable')
 
   const messages = await db.message.findMany({
-    where: { conversationId: conversationId },
+    where: { conversationId },
     include: { expediteur: { select: { id: true, nom: true, role: true } } },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
   })
-
-  return NextResponse.json(messages)
-}
+  return json(messages.reverse())
+})

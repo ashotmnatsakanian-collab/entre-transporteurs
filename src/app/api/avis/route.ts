@@ -1,77 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { avisSchema } from '@/lib/validations/avis'
+import { paireCle } from '@/lib/conversations'
+import { ApiError, exigerAccesCommissionnaire, exigerEmailVerifie, gerer, json, limiter, lireJson, lireQuery } from '@/lib/api'
 
-// GET /api/avis?transporteurId= — liste des avis + moyenne pour un transporteur
-export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
+// "François Leroy" -> "François L." : on n'affiche pas le nom complet d'un auteur d'avis
+function nomAbrege(nom: string): string {
+  const [prenom, ...reste] = nom.trim().split(/\s+/)
+  return reste.length > 0 ? `${prenom} ${reste[reste.length - 1][0].toUpperCase()}.` : prenom
+}
 
-  const transporteurId = new URL(req.url).searchParams.get('transporteurId')
-  if (!transporteurId) return NextResponse.json({ error: 'transporteurId requis' }, { status: 400 })
+// GET /api/avis?transporteurId= — avis et moyenne d'un transporteur
+export const GET = gerer(async (req) => {
+  await exigerAccesCommissionnaire()
+  const { transporteurId } = lireQuery(req, z.object({ transporteurId: z.string().min(1).max(40) }))
 
   const [avis, agregat] = await Promise.all([
     db.avis.findMany({
       where: { transporteurId },
       include: { auteur: { select: { nom: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     }),
     db.avis.aggregate({ where: { transporteurId }, _avg: { note: true }, _count: true }),
   ])
 
-  return NextResponse.json({
-    avis,
+  return json({
+    avis: avis.map((a) => ({ id: a.id, note: a.note, commentaire: a.commentaire, createdAt: a.createdAt, auteur: { nom: nomAbrege(a.auteur.nom) } })),
     moyenne: agregat._avg.note ?? null,
     total: agregat._count,
   })
-}
+})
 
-// POST /api/avis — publier ou mettre à jour son propre avis sur un transporteur
-// Réservé aux commissionnaires ayant déjà échangé avec ce transporteur (anti-faux avis)
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
-  if (session.user.role !== 'COMMISSIONNAIRE') {
-    return NextResponse.json({ error: 'Seuls les commissionnaires peuvent laisser un avis' }, { status: 403 })
+// POST /api/avis — noter un transporteur
+// Condition anti-faux avis : une vraie conversation avec échange dans les deux sens.
+export const POST = gerer(async (req) => {
+  const u = await exigerAccesCommissionnaire()
+  exigerEmailVerifie(u)
+  limiter(req, 'avis', 10, 60 * 60_000, u.id)
+  const data = await lireJson(req, avisSchema)
+
+  const profil = await db.transporteurProfil.findUnique({ where: { id: data.transporteurId }, select: { userId: true } })
+  if (!profil) throw new ApiError(404, 'Transporteur introuvable')
+
+  const conv = await db.conversation.findUnique({
+    where: { cle: paireCle(u.id, profil.userId) },
+    select: { messages: { where: { expediteurId: { in: [u.id, profil.userId] } }, select: { expediteurId: true }, distinct: ['expediteurId'] } },
+  })
+  if (!conv || conv.messages.length < 2) {
+    throw new ApiError(403, "Vous pouvez noter ce transporteur une fois qu'il vous a répondu.")
   }
 
-  try {
-    const body = await req.json()
-    const data = avisSchema.parse(body)
-
-    const profil = await db.transporteurProfil.findUnique({ where: { id: data.transporteurId } })
-    if (!profil) return NextResponse.json({ error: 'Transporteur introuvable' }, { status: 404 })
-
-    const dejaEchange = await db.conversation.findFirst({
-      where: {
-        AND: [
-          { participants: { some: { userId: session.user.id } } },
-          { participants: { some: { userId: profil.userId } } },
-        ],
-      },
-    })
-    if (!dejaEchange) {
-      return NextResponse.json({ error: 'Vous devez avoir échangé avec ce transporteur pour le noter' }, { status: 403 })
-    }
-
-    const avis = await db.avis.upsert({
-      where: { auteurId_transporteurId: { auteurId: session.user.id, transporteurId: data.transporteurId } },
-      update: { note: data.note, commentaire: data.commentaire ?? null },
-      create: {
-        auteurId: session.user.id,
-        transporteurId: data.transporteurId,
-        note: data.note,
-        commentaire: data.commentaire ?? null,
-      },
-    })
-    return NextResponse.json(avis, { status: 201 })
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'ZodError') {
-      return NextResponse.json({ error: 'Données invalides', details: err }, { status: 400 })
-    }
-    console.error('[avis POST]', err)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-}
+  const avis = await db.avis.upsert({
+    where: { auteurId_transporteurId: { auteurId: u.id, transporteurId: data.transporteurId } },
+    update: { note: data.note, commentaire: data.commentaire ?? null },
+    create: { auteurId: u.id, transporteurId: data.transporteurId, note: data.note, commentaire: data.commentaire ?? null },
+  })
+  return json({ id: avis.id }, { status: 201 })
+})

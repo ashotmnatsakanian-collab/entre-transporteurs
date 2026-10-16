@@ -13,6 +13,26 @@ datasource db {
 enum Role {
   TRANSPORTEUR
   COMMISSIONNAIRE
+  ADMIN
+}
+
+enum TypeToken {
+  VERIFICATION_EMAIL
+  REINITIALISATION_MDP
+}
+
+enum MotifSignalement {
+  SPAM
+  FAUSSE_IDENTITE
+  COMPORTEMENT_ABUSIF
+  ARNAQUE
+  AUTRE
+}
+
+enum StatutSignalement {
+  OUVERT
+  TRAITE
+  REJETE
 }
 
 enum StatutAbonnement {
@@ -57,9 +77,20 @@ model User {
   nom       String
   telephone String?
   role      Role
+  // Badge "SIRET vérifié" : entreprise existante et active (API officielle) ou validation admin
   verifie   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  emailVerifieLe DateTime?
+  cguAccepteesLe DateTime?
+  // Compte suspendu par un administrateur : connexion et sessions refusées
+  suspendu       Boolean   @default(false)
+  alertesEmail   Boolean   @default(true)
+  // RGPD : compte anonymisé (les messages échangés sont conservés pour l'interlocuteur)
+  supprimeLe     DateTime?
+  // Les sessions ouvertes avant cette date sont invalidées (changement / réinitialisation du mot de passe)
+  motDePasseChangeLe DateTime?
 
   transporteurProfil    TransporteurProfil?
   commissionnaireProfil CommissionnaireProfil?
@@ -67,6 +98,10 @@ model User {
   messagesEnvoyes       Message[]                 @relation("expediteur")
   participations        ConversationParticipant[]
   avisDonnes            Avis[]                    @relation("auteurAvis")
+  tokens                TokenEmail[]
+  signalementsEmis      Signalement[]             @relation("signalant")
+  signalementsRecus     Signalement[]             @relation("signale")
+  alertes               Alerte[]
 }
 
 // ─── Profils ──────────────────────────────────────────────────────────────────
@@ -79,6 +114,9 @@ model TransporteurProfil {
   siret         String
   raisonSociale String
   description   String?
+
+  siretVerifieLe     DateTime?
+  activiteOfficielle String?
 
   // Point de base — requêtes géo via $queryRaw (haversine / PostGIS)
   latitude  Float
@@ -108,6 +146,11 @@ model CommissionnaireProfil {
 
   siret         String
   raisonSociale String
+
+  siretVerifieLe     DateTime?
+  activiteOfficielle String?
+
+  besoins Besoin[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -173,7 +216,7 @@ model Annonce {
 
   @@index([latDepart, lngDepart])
   @@index([dateDisponibilite])
-  @@index([active])
+  @@index([active, dateDisponibilite])
 }
 
 // ─── Avis ─────────────────────────────────────────────────────────────────────
@@ -201,6 +244,9 @@ model Avis {
 
 model Conversation {
   id        String   @id @default(cuid())
+  // userIds triés et joints : garantit une seule conversation par paire d'utilisateurs,
+  // même si deux requêtes concurrentes tentent de la créer
+  cle       String?  @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -227,11 +273,12 @@ model Message {
   expediteur     User         @relation("expediteur", fields: [expediteurId], references: [id])
 
   contenu String
-  lu      Boolean  @default(false)
+  lu      Boolean @default(false)
 
   createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, expediteurId, lu])
   @@index([expediteurId])
 }
 
@@ -251,4 +298,98 @@ model Abonnement {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Besoins de transport ──────────────────────────────────────────────────────
+// Le sens inverse des annonces : un commissionnaire publie un fret à faire
+// transporter, les transporteurs proches répondent.
+
+model Besoin {
+  id                String                @id @default(cuid())
+  commissionnaireId String
+  commissionnaire   CommissionnaireProfil @relation(fields: [commissionnaireId], references: [id], onDelete: Cascade)
+
+  villeDepart  String
+  latDepart    Float
+  lngDepart    Float
+  villeArrivee String
+
+  dateEnlevement DateTime
+  typeVehicule   TypeVehicule?
+  poidsKg        Float?
+  description    String?
+  active         Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([latDepart, lngDepart])
+  @@index([active, dateEnlevement])
+}
+
+// ─── Alertes (recherche enregistrée d'un commissionnaire) ──────────────────────
+
+model Alerte {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  villeDepart  String
+  latDepart    Float
+  lngDepart    Float
+  rayonKm      Int     @default(100)
+  villeArrivee String?
+
+  actif           Boolean   @default(true)
+  derniereNotifLe DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([actif])
+}
+
+// ─── Sécurité & modération ─────────────────────────────────────────────────────
+
+// Jetons à usage unique envoyés par e-mail — seul le hachage SHA-256 est stocké
+model TokenEmail {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TypeToken
+  tokenHash String    @unique
+  expireLe  DateTime
+  utiliseLe DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, type])
+}
+
+model Signalement {
+  id          String            @id @default(cuid())
+  signalantId String
+  signalant   User              @relation("signalant", fields: [signalantId], references: [id], onDelete: Cascade)
+  cibleId     String
+  cible       User              @relation("signale", fields: [cibleId], references: [id], onDelete: Cascade)
+  motif       MotifSignalement
+  details     String?
+  statut      StatutSignalement @default(OUVERT)
+  createdAt   DateTime          @default(now())
+  traiteLe    DateTime?
+
+  @@index([statut, createdAt])
+  @@index([cibleId])
+}
+
+// Piste d'audit : connexions, échecs, réinitialisations, actions admin.
+// Pas de clé étrangère : les traces survivent à la suppression du compte.
+model JournalSecurite {
+  id        String   @id @default(cuid())
+  type      String
+  userId    String?
+  ip        String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
 }
