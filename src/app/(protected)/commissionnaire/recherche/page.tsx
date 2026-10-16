@@ -1,6 +1,4 @@
-import dynamic from 'next/dynamic'
-
-const RechercheClient = dynamic(() => import('@/components/recherche/RechercheClient'), { ssr: false })
+import { RechercheChargeur } from '@/components/recherche/RechercheChargeur'
 
 export default function RecherchePage() {
   return (
@@ -9,7 +7,7 @@ export default function RecherchePage() {
         <h1 className="text-xl font-bold text-slate-800">Rechercher un transporteur</h1>
         <p className="text-sm text-slate-500">Filtrez par zone, type de véhicule et spécificités</p>
       </div>
-      <RechercheClient />
+      <RechercheChargeur />
     </div>
   )
 }

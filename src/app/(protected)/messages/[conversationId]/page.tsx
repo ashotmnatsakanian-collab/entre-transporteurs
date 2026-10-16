@@ -5,12 +5,13 @@ import { notFound } from 'next/navigation'
 import { FilDiscussion } from '@/components/messagerie/FilDiscussion'
 import { getIO } from '@/lib/socket-server'
 
-export default async function ConversationPage({ params }: { params: { conversationId: string } }) {
+export default async function ConversationPage({ params }: { params: Promise<{ conversationId: string }> }) {
+  const { conversationId } = await params
   const session = await getServerSession(authOptions)
 
   const conversation = await db.conversation.findFirst({
     where: {
-      id: params.conversationId,
+      id: conversationId,
       participants: { some: { userId: session!.user.id } },
     },
     include: {

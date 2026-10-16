@@ -5,6 +5,7 @@ node_modules/
 
 # Build
 .next/
+.next-*/
 out/
 .server/
 build/
@@ -14,8 +15,7 @@ build/
 .env.local
 .env.*.local
 
-# Prisma
-prisma/migrations/
+# Prisma (les migrations DOIVENT être versionnées pour le déploiement)
 
 # Misc
 .DS_Store

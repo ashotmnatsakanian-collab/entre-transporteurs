@@ -7,19 +7,20 @@ import { getIO } from '@/lib/socket-server'
 // PATCH /api/messages/:conversationId/lu — marquer les messages reçus comme lus
 export async function PATCH(
   _req: NextRequest,
-  { params }: { params: { conversationId: string } }
+  { params }: { params: Promise<{ conversationId: string }> }
 ) {
+  const { conversationId } = await params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   const participant = await db.conversationParticipant.findUnique({
-    where: { conversationId_userId: { conversationId: params.conversationId, userId: session.user.id } },
+    where: { conversationId_userId: { conversationId: conversationId, userId: session.user.id } },
   })
   if (!participant) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
 
   const { count } = await db.message.updateMany({
     where: {
-      conversationId: params.conversationId,
+      conversationId: conversationId,
       expediteurId: { not: session.user.id },
       lu: false,
     },
@@ -28,7 +29,7 @@ export async function PATCH(
 
   // Prévenir l'expéditeur en direct que ses messages ont été lus (indicateur "· Lu")
   if (count > 0) {
-    getIO()?.to(`conv:${params.conversationId}`).emit('messages-read', { conversationId: params.conversationId })
+    getIO()?.to(`conv:${conversationId}`).emit('messages-read', { conversationId: conversationId })
   }
 
   return NextResponse.json({ success: true })

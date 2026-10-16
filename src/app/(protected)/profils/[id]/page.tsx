@@ -8,10 +8,11 @@ import { ContactButton } from '@/components/ui/ContactButton'
 import { SectionAvis } from '@/components/avis/SectionAvis'
 import { BadgeNote } from '@/components/avis/Etoiles'
 
-export default async function ProfilPublicPage({ params }: { params: { id: string } }) {
+export default async function ProfilPublicPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const session = await getServerSession(authOptions)
   const profil = await db.transporteurProfil.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       user: { select: { id: true, nom: true, email: true, telephone: true, createdAt: true, verifie: true } },
       vehicules: { where: { actif: true }, orderBy: { type: 'asc' } },

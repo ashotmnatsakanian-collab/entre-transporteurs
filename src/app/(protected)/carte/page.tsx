@@ -1,9 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import dynamic from 'next/dynamic'
-
-const CarteInteractive = dynamic(() => import('@/components/carte/CarteInteractive'), { ssr: false })
+import { CarteClient } from '@/components/carte/CarteClient'
 
 export default async function CartePage() {
   const session = await getServerSession(authOptions)
@@ -40,7 +38,7 @@ export default async function CartePage() {
         </div>
       </div>
       <div className="flex-1">
-        <CarteInteractive
+        <CarteClient
           transporteurs={JSON.parse(JSON.stringify(transporteursAvecAvis))}
           currentUserId={session?.user.id}
         />

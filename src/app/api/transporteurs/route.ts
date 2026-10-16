@@ -4,20 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { profilTransporteurSchema } from '@/lib/validations/profil'
 
-export const dynamic = 'force-dynamic'
-
-// GET /api/transporteurs — liste tous les transporteurs (gratuit, pas de gating — pour la carte)
-export async function GET() {
-  const transporteurs = await db.transporteurProfil.findMany({
-    include: {
-      user: { select: { nom: true, email: true, telephone: true } },
-      vehicules: { where: { actif: true } },
-      _count: { select: { vehicules: true } },
-    },
-  })
-  return NextResponse.json(transporteurs)
-}
-
 // PUT /api/transporteurs — mettre à jour son propre profil transporteur
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions)

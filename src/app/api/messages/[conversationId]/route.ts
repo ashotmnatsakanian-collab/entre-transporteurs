@@ -13,17 +13,18 @@ async function participantValide(conversationId: string, userId: string): Promis
 // GET /api/messages/:conversationId — historique d'une conversation
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { conversationId: string } }
+  { params }: { params: Promise<{ conversationId: string }> }
 ) {
+  const { conversationId } = await params
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  if (!(await participantValide(params.conversationId, session.user.id))) {
+  if (!(await participantValide(conversationId, session.user.id))) {
     return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
   }
 
   const messages = await db.message.findMany({
-    where: { conversationId: params.conversationId },
+    where: { conversationId: conversationId },
     include: { expediteur: { select: { id: true, nom: true, role: true } } },
     orderBy: { createdAt: 'asc' },
   })

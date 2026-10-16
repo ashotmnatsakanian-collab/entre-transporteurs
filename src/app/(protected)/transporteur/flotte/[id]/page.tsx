@@ -4,11 +4,12 @@ import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { FormulaireVehicule } from '@/components/flotte/FormulaireVehicule'
 
-export default async function EditVehiculePage({ params }: { params: { id: string } }) {
+export default async function EditVehiculePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const session = await getServerSession(authOptions)
 
   const vehicule = await db.vehicule.findFirst({
-    where: { id: params.id, transporteur: { userId: session!.user.id } },
+    where: { id, transporteur: { userId: session!.user.id } },
   })
 
   if (!vehicule) notFound()
