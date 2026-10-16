@@ -4,7 +4,7 @@ import { getToken } from 'next-auth/jwt'
 const estProduction = process.env.NODE_ENV === 'production'
 
 // Chemins qui exigent une session (défense en profondeur : chaque route re-vérifie de son côté)
-const PAGES_PROTEGEES = ['/carte', '/transporteur', '/commissionnaire', '/profils', '/messages', '/compte', '/admin', '/abonnement/succes', '/abonnement/reactivation']
+const PAGES_PROTEGEES = ['/carte', '/transporteur', '/commissionnaire', '/profils', '/messages', '/compte', '/admin', '/accepter-cgu', '/abonnement/succes', '/abonnement/reactivation']
 const API_PROTEGEES = [
   '/api/transporteurs', '/api/commissionnaires', '/api/vehicules', '/api/recherche', '/api/messages',
   '/api/annonces', '/api/avis', '/api/besoins', '/api/alertes', '/api/compte', '/api/signalements',

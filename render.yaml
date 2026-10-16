@@ -56,3 +56,5 @@ services:
       #   sync: false
       # - key: STRIPE_WEBHOOK_SECRET
       #   sync: false
+      # - key: FACTURATION_A_PARTIR_DU   # obligatoire avec Stripe, ex. 2027-01-15 (préavis de 30 jours minimum)
+      #   sync: false

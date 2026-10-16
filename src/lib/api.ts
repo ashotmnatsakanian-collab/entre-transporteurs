@@ -6,6 +6,7 @@ import { authOptions } from './auth'
 import { db } from './db'
 import { emailActif } from './email'
 import { aAccesPayant } from './acces'
+import { VERSION_CGU } from './legal'
 import { consommer } from './rate-limit'
 import { ipClient } from './ip'
 import { log, messageErreur } from './logger'
@@ -129,6 +130,8 @@ export interface Utilisateur {
   role: Role
   verifie: boolean
   emailVerifie: boolean
+  /** Le compte a accepté la version en vigueur des CGU */
+  cguAcceptees: boolean
 }
 
 /**
@@ -141,12 +144,12 @@ export async function utilisateurCourant(): Promise<Utilisateur | null> {
   if (!id) return null
   const u = await db.user.findUnique({
     where: { id },
-    select: { id: true, email: true, nom: true, role: true, verifie: true, emailVerifieLe: true, suspendu: true, supprimeLe: true, motDePasseChangeLe: true },
+    select: { id: true, email: true, nom: true, role: true, verifie: true, emailVerifieLe: true, cguVersion: true, suspendu: true, supprimeLe: true, motDePasseChangeLe: true },
   })
   if (!u || u.suspendu || u.supprimeLe) return null
   // Session ouverte avant le dernier changement de mot de passe : révoquée
   if (u.motDePasseChangeLe && (session.user.connecteLe ?? 0) < u.motDePasseChangeLe.getTime()) return null
-  return { id: u.id, email: u.email, nom: u.nom, role: u.role, verifie: u.verifie, emailVerifie: !emailActif || !!u.emailVerifieLe }
+  return { id: u.id, email: u.email, nom: u.nom, role: u.role, verifie: u.verifie, emailVerifie: !emailActif || !!u.emailVerifieLe, cguAcceptees: u.cguVersion === VERSION_CGU }
 }
 
 export async function exigerUtilisateur(...roles: Role[]): Promise<Utilisateur> {

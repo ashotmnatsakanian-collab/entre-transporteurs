@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { exigerRoleOuRediriger } from '@/lib/garde'
 import Link from 'next/link'
+import { facturationActive } from '@/lib/facturation'
 
 export default async function DashboardCommissionnairePage() {
   const u = await exigerRoleOuRediriger('COMMISSIONNAIRE')
@@ -32,7 +33,7 @@ export default async function DashboardCommissionnairePage() {
         <StatCard label="Messages non lus" value={nbNonLus} icon="📬" />
         <StatCard
           label="Abonnement"
-          value={process.env.STRIPE_SECRET_KEY ? (abo?.statut === 'TRIALING' ? 'Essai gratuit' : 'Actif') : 'Gratuit (lancement)'}
+          value={libelleAbonnement(abo?.statut)}
           icon="💳"
         />
       </div>
@@ -56,6 +57,11 @@ export default async function DashboardCommissionnairePage() {
       </div>
     </div>
   )
+}
+
+function libelleAbonnement(statut?: string): string {
+  if (facturationActive()) return statut === 'TRIALING' ? 'Essai gratuit' : 'Actif'
+  return 'Gratuit (lancement)'
 }
 
 function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {

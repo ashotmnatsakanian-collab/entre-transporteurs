@@ -1,4 +1,5 @@
 import { PrismaClient, Role, TypeVehicule, Specificite, StatutAbonnement } from '@prisma/client'
+import { VERSION_CGU } from '../src/lib/legal'
 import { hash } from 'bcryptjs'
 import { addDays } from 'date-fns'
 
@@ -103,7 +104,7 @@ async function main() {
         role: Role.TRANSPORTEUR,
         verifie: true,
         emailVerifieLe: new Date(),
-        cguAccepteesLe: new Date(),
+        cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
         // Les transporteurs sont gratuits — pas d'abonnement
         transporteurProfil: {
           create: {
@@ -214,7 +215,7 @@ async function main() {
         role: Role.COMMISSIONNAIRE,
         verifie: true,
         emailVerifieLe: new Date(),
-        cguAccepteesLe: new Date(),
+        cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
         abonnement: {
           create: {
             statut: StatutAbonnement.TRIALING,

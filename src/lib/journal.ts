@@ -12,6 +12,7 @@ export type TypeEvenement =
   | 'email_verifie'
   | 'compte_supprime'
   | 'export_donnees'
+  | 'cgu_acceptees'
   | 'signalement'
   | 'admin_action'
   | 'acces_refuse'

@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { SouscriptionButton } from '@/components/abonnement/SouscriptionButton'
+import { facturationActive, facturationAnnoncee } from '@/lib/facturation'
 
 export const metadata = { title: 'Tarifs — Entre Transporteurs' }
 
 export default function TarificationPage() {
-  // Tant que Stripe n'est pas configuré, personne ne peut payer : on ne promet pas un prélèvement
-  const paiementActif = !!process.env.STRIPE_SECRET_KEY
+  // Tant que le paiement n'est pas ouvert, personne ne peut payer : on ne promet pas un prélèvement
+  const paiementActif = facturationActive()
+  const dateAnnoncee = facturationAnnoncee()
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-900 to-brand-600 flex flex-col items-center justify-center p-6">
       <Link href="/" className="text-white text-2xl font-bold mb-2">🚛 Entre Transporteurs</Link>
@@ -21,7 +23,7 @@ export default function TarificationPage() {
             Transporteur
           </div>
           <h2 className="text-3xl font-bold text-slate-800">Gratuit</h2>
-          <p className="text-slate-400 text-sm">Pour toujours, sans carte bancaire</p>
+          <p className="text-slate-400 text-sm">Sans carte bancaire</p>
 
           <ul className="mt-6 space-y-3 text-left text-slate-700 text-sm flex-1">
             {[
@@ -59,7 +61,11 @@ export default function TarificationPage() {
             <>
               <h2 className="text-3xl font-bold text-slate-800">Gratuit</h2>
               <p className="text-green-600 font-semibold mt-2">Offre de lancement</p>
-              <p className="text-slate-400 text-sm">Tarif prévu ensuite : 69 € TTC/mois — vous serez prévenu au moins 30 jours avant, sans prélèvement automatique.</p>
+              <p className="text-slate-400 text-sm">
+                {dateAnnoncee
+                  ? `Gratuit jusqu'au ${dateAnnoncee.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}, puis 69 € TTC/mois avec 30 jours d'essai sans carte.`
+                  : 'Tarif prévu ensuite : 69 € TTC/mois — vous serez prévenu au moins 30 jours avant, sans prélèvement automatique.'}
+              </p>
             </>
           )}
 
@@ -92,7 +98,7 @@ export default function TarificationPage() {
       </div>
 
       <p className="mt-6 text-brand-200 text-xs">
-        {paiementActif ? 'Résiliation possible à tout moment · Paiement sécurisé par Stripe' : 'Aucune carte bancaire demandée pendant le lancement'}
+        {paiementActif ? 'Résiliation possible à tout moment · Paiement sécurisé par Stripe' : 'Aucune carte bancaire demandée pendant le lancement'} · <Link href="/cgu" className="underline">Conditions d'utilisation</Link>
       </p>
     </div>
   )

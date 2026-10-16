@@ -14,6 +14,8 @@ import { io as ouvrirSocket } from 'socket.io-client'
 import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcryptjs'
 import { creerToken } from '../src/lib/tokens'
+import { VERSION_CGU } from '../src/lib/legal'
+import { purgerDonneesExpirees } from '../src/lib/purge'
 
 const BASE = (process.env.BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
 const MOT_DE_PASSE = 'Password123!'
@@ -291,6 +293,7 @@ async function main() {
   verifier('un transporteur n’a pas d’abonnement', enBase.abonnement === null)
   verifier('le profil est créé avec le compte', !!enBase.transporteurProfil)
   verifier('le consentement CGU est horodaté', !!enBase.cguAccepteesLe)
+  verifier('la version des CGU acceptée est enregistrée', enBase.cguVersion === VERSION_CGU)
 
   verifier('connexion du nouveau compte', (await test.connecter(emailTest)).connecte)
   verifier('session valide (GET /api/messages 200)', (await test.requete('/api/messages')).statut === 200)
@@ -377,7 +380,7 @@ async function main() {
   // ── 10. Administration ───────────────────────────────────────────────────────
   section('Administration et suspension de compte')
   await db.user.create({
-    data: { email: ADMIN_EMAIL, nom: 'Admin Vérif', role: 'ADMIN', password: await hash(MOT_DE_PASSE, 10), emailVerifieLe: new Date(), cguAccepteesLe: new Date() },
+    data: { email: ADMIN_EMAIL, nom: 'Admin Vérif', role: 'ADMIN', password: await hash(MOT_DE_PASSE, 10), emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU },
   })
   verifier('connexion administrateur', (await admin.connecter(ADMIN_EMAIL)).connecte)
   verifier('espace admin accessible (200)', (await admin.requete('/admin')).statut === 200)
@@ -388,7 +391,7 @@ async function main() {
   await db.user.create({
     data: {
       email: emailVictime, nom: 'Victime Test', role: 'COMMISSIONNAIRE', password: await hash(MOT_DE_PASSE, 10),
-      emailVerifieLe: new Date(), cguAccepteesLe: new Date(),
+      emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
       commissionnaireProfil: { create: { siret: '', raisonSociale: 'Victime' } },
       abonnement: { create: { statut: 'TRIALING', dateFinEssai: new Date(Date.now() + 86_400_000) } },
     },
@@ -401,7 +404,44 @@ async function main() {
   verifier('compte suspendu : connexion refusée', !(await new Client('v2').connecter(emailVictime)).connecte)
   verifier("l'admin ne peut pas modifier un autre admin (403)", (await admin.requete(`/api/admin/utilisateurs/${(await db.user.findFirstOrThrow({ where: { email: ADMIN_EMAIL } })).id}`, { method: 'PATCH', json: { suspendu: true } })).statut === 403)
   verifier("la suspension est tracée dans le journal d'audit", (await db.journalSecurite.count({ where: { type: 'admin_action', details: { contains: idVictime } } })) > 0)
+  verifier("l'admin ne peut PAS accorder le badge « SIRET vérifié » à la main (400)", (await admin.requete(`/api/admin/utilisateurs/${idVictime}`, { method: 'PATCH', json: { verifie: true } })).statut === 400)
+  verifier("l'admin peut retirer le badge (200)", (await admin.requete(`/api/admin/utilisateurs/${idVictime}`, { method: 'PATCH', json: { verifie: false } })).statut === 200)
   await db.user.delete({ where: { id: idVictime } })
+
+  // ── Conformité juridique ─────────────────────────────────────────────────────
+  section('Conformité juridique (CGU, rétention des données)')
+  const emailCgu = `cgu-${randomBytes(3).toString('hex')}@example.invalid`
+  await db.user.create({
+    data: {
+      email: emailCgu, nom: 'CGU Test', role: 'COMMISSIONNAIRE', password: await hash(MOT_DE_PASSE, 10),
+      emailVerifieLe: new Date(), cguAccepteesLe: new Date('2020-01-01'), cguVersion: '1999-01-01',
+      commissionnaireProfil: { create: { siret: '', raisonSociale: 'CGU Test' } },
+      abonnement: { create: { statut: 'TRIALING', dateFinEssai: new Date(Date.now() + 86_400_000) } },
+    },
+  })
+  const clientCgu = new Client('cgu')
+  await clientCgu.connecter(emailCgu)
+  const avantCgu = await clientCgu.requete('/commissionnaire')
+  verifier('CGU périmées : toute page protégée renvoie vers la page d\'acceptation', avantCgu.statut >= 300 && avantCgu.statut < 400 && (avantCgu.entetes.get('location') ?? '').includes('/accepter-cgu'), `statut ${avantCgu.statut} → ${avantCgu.entetes.get('location')}`)
+  verifier("la page d'acceptation reste accessible (200)", (await clientCgu.requete('/accepter-cgu')).statut === 200)
+  verifier('accepter une version périmée est refusé (409)', (await clientCgu.requete('/api/compte/cgu', { method: 'POST', json: { version: '1999-01-01' } })).statut === 409)
+  verifier("accepter sans être connecté est refusé (401)", (await anon.requete('/api/compte/cgu', { method: 'POST', json: { version: VERSION_CGU } })).statut === 401)
+  verifier('accepter la version en vigueur (200)', (await clientCgu.requete('/api/compte/cgu', { method: 'POST', json: { version: VERSION_CGU } })).statut === 200)
+  const apresCgu = await clientCgu.requete('/commissionnaire')
+  verifier('CGU acceptées : accès rétabli (200)', apresCgu.statut === 200, `statut ${apresCgu.statut}`)
+  const enBaseCgu = await db.user.findUniqueOrThrow({ where: { email: emailCgu }, select: { cguVersion: true } })
+  verifier("l'acceptation est enregistrée avec sa version", enBaseCgu.cguVersion === VERSION_CGU)
+  verifier("l'acceptation est tracée dans le journal d'audit", (await db.journalSecurite.count({ where: { type: 'cgu_acceptees', details: VERSION_CGU } })) > 0)
+  await db.user.delete({ where: { email: emailCgu } })
+
+  const marqueur = `verif-purge-${randomBytes(3).toString('hex')}`
+  const treizeMois = new Date(); treizeMois.setMonth(treizeMois.getMonth() - 13)
+  await db.journalSecurite.create({ data: { type: 'verif', details: `${marqueur}-ancien`, createdAt: treizeMois } })
+  await db.journalSecurite.create({ data: { type: 'verif', details: `${marqueur}-recent` } })
+  await purgerDonneesExpirees()
+  verifier('la purge supprime le journal de plus de 12 mois', (await db.journalSecurite.count({ where: { details: `${marqueur}-ancien` } })) === 0)
+  verifier('la purge conserve le journal récent', (await db.journalSecurite.count({ where: { details: `${marqueur}-recent` } })) === 1)
+  await db.journalSecurite.deleteMany({ where: { details: { startsWith: marqueur } } })
 
   // ── 11. Sockets ──────────────────────────────────────────────────────────────
   section('Temps réel (Socket.io)')

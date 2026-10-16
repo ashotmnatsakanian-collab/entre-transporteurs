@@ -7,6 +7,7 @@ import { creerToken } from '@/lib/tokens'
 import { emailActif, emailVerification, envoyerEmail, urlApplication } from '@/lib/email'
 import { journaliser } from '@/lib/journal'
 import { ipClient } from '@/lib/ip'
+import { VERSION_CGU } from '@/lib/legal'
 import { ApiError, gerer, json, limiter, lireJson } from '@/lib/api'
 
 // POST /api/auth/register
@@ -30,6 +31,7 @@ export const POST = gerer(async (req) => {
       telephone: data.telephone,
       role: data.role,
       cguAccepteesLe: maintenant,
+      cguVersion: VERSION_CGU,
       // Sans service d'e-mail configuré, la vérification ne peut pas avoir lieu : on ne bloque personne
       emailVerifieLe: emailActif ? null : maintenant,
       ...(data.role === 'TRANSPORTEUR'

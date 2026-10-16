@@ -64,6 +64,11 @@ export function Sidebar({ role }: { role: Role }) {
         })}
       </nav>
       <div className="px-2 pb-4">
+        <div className="hidden sm:flex flex-wrap justify-center gap-x-2 gap-y-0.5 text-[10px] text-slate-500 mb-3">
+          <Link href="/cgu" className="hover:text-slate-300">CGU</Link>
+          <Link href="/confidentialite" className="hover:text-slate-300">Confidentialité</Link>
+          <Link href="/mentions-legales" className="hover:text-slate-300">Mentions</Link>
+        </div>
         <div className={clsx(
           'px-2 py-1.5 rounded text-xs text-center hidden sm:block',
           role === 'TRANSPORTEUR' ? 'bg-blue-900 text-blue-300' : role === 'ADMIN' ? 'bg-purple-900 text-purple-300' : 'bg-amber-900 text-amber-300'

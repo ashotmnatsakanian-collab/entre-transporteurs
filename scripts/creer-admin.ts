@@ -8,6 +8,7 @@ import { randomBytes } from 'crypto'
 import { hash } from 'bcryptjs'
 import { PrismaClient } from '@prisma/client'
 import { z } from 'zod'
+import { VERSION_CGU } from '../src/lib/legal'
 
 const db = new PrismaClient()
 
@@ -23,7 +24,7 @@ async function main() {
     update: { role: 'ADMIN', password: await hash(motDePasse, 12), suspendu: false, supprimeLe: null, motDePasseChangeLe: maintenant },
     create: {
       email, nom: 'Administrateur', role: 'ADMIN', password: await hash(motDePasse, 12),
-      emailVerifieLe: maintenant, cguAccepteesLe: maintenant, verifie: true,
+      emailVerifieLe: maintenant, cguAccepteesLe: maintenant, cguVersion: VERSION_CGU, verifie: true,
     },
     select: { id: true },
   })

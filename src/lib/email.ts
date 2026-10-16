@@ -1,5 +1,6 @@
 import { log, messageErreur } from './logger'
 import { estProduction } from './env'
+import { EDITEUR } from './legal'
 
 // Fournisseur : Resend (https://resend.com, 3000 e-mails/mois gratuits) via son API HTTP.
 // Sans RESEND_API_KEY : les e-mails sont simulés (affichés dans la console) en dehors
@@ -22,6 +23,8 @@ interface Email {
   sujet: string
   html: string
   texte: string
+  /** En-têtes supplémentaires (ex. List-Unsubscribe pour les alertes) */
+  entetes?: Record<string, string>
 }
 
 export async function envoyerEmail(email: Email): Promise<boolean> {
@@ -37,7 +40,7 @@ export async function envoyerEmail(email: Email): Promise<boolean> {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EXPEDITEUR, to: [email.to], subject: email.sujet, html: email.html, text: email.texte }),
+      body: JSON.stringify({ from: EXPEDITEUR, to: [email.to], subject: email.sujet, html: email.html, text: email.texte, ...(email.entetes && { headers: email.entetes }) }),
       signal: AbortSignal.timeout(8000),
     })
     if (!res.ok) {
@@ -51,13 +54,13 @@ export async function envoyerEmail(email: Email): Promise<boolean> {
   }
 }
 
-function gabarit(titre: string, corpsHtml: string, boutonLabel?: string, boutonUrl?: string): string {
+function gabarit(titre: string, corpsHtml: string, boutonLabel?: string, boutonUrl?: string, piedHtml = ''): string {
   const bouton = boutonUrl
     ? `<p style="margin:24px 0"><a href="${echapperHtml(boutonUrl)}" style="background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">${echapperHtml(boutonLabel ?? 'Ouvrir')}</a></p>`
     : ''
   return `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:auto;color:#1e293b">
 <h2 style="color:#1e3a8a">🚛 Entre Transporteurs</h2><h3>${echapperHtml(titre)}</h3>${corpsHtml}${bouton}
-<p style="font-size:12px;color:#94a3b8">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail.</p></div>`
+${piedHtml || `<p style="font-size:12px;color:#94a3b8">Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet e-mail.</p>`}</div>`
 }
 
 export function emailVerification(nom: string, url: string): Email & { to?: string } {
@@ -78,12 +81,24 @@ export function emailReinitialisation(nom: string, url: string): Email {
   }
 }
 
+/** Mentions des e-mails d'alerte : expéditeur identifié et moyen simple de ne plus en recevoir. */
+function piedAlerte() {
+  const gestion = urlApplication('/compte')
+  const identite = `${EDITEUR.nom}${EDITEUR.adresse.startsWith('[') ? '' : ` — ${EDITEUR.adresse}`}`
+  return {
+    html: `<p style="font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px">Vous recevez cet e-mail car vous avez activé des alertes sur Entre Transporteurs. <a href="${echapperHtml(gestion)}" style="color:#94a3b8">Gérer ou désactiver mes alertes</a>.<br>${echapperHtml(identite)}</p>`,
+    texte: `\n--\nVous recevez cet e-mail car vous avez activé des alertes sur Entre Transporteurs.\nGérer ou désactiver vos alertes : ${gestion}\n${identite}\n`,
+    entetes: { 'List-Unsubscribe': `<${gestion}>` },
+  }
+}
+
 export function emailAlerteAnnonce(nom: string, resume: string, url: string): Email {
   return {
     to: '',
     sujet: 'Nouvelle disponibilité correspondant à votre alerte',
-    html: gabarit('Un transporteur est disponible', `<p>Bonjour ${echapperHtml(nom)},</p><p>${echapperHtml(resume)}</p>`, 'Voir la disponibilité', url),
-    texte: `Bonjour ${nom},\n\n${resume}\n\n${url}\n`,
+    html: gabarit('Un transporteur est disponible', `<p>Bonjour ${echapperHtml(nom)},</p><p>${echapperHtml(resume)}</p>`, 'Voir la disponibilité', url, piedAlerte().html),
+    texte: `Bonjour ${nom},\n\n${resume}\n\n${url}\n${piedAlerte().texte}`,
+    entetes: piedAlerte().entetes,
   }
 }
 
@@ -91,7 +106,8 @@ export function emailAlerteBesoin(nom: string, resume: string, url: string): Ema
   return {
     to: '',
     sujet: 'Un fret à transporter près de chez vous',
-    html: gabarit('Un commissionnaire cherche un transporteur', `<p>Bonjour ${echapperHtml(nom)},</p><p>${echapperHtml(resume)}</p>`, 'Voir le besoin', url),
-    texte: `Bonjour ${nom},\n\n${resume}\n\n${url}\n`,
+    html: gabarit('Un commissionnaire cherche un transporteur', `<p>Bonjour ${echapperHtml(nom)},</p><p>${echapperHtml(resume)}</p>`, 'Voir le besoin', url, piedAlerte().html),
+    texte: `Bonjour ${nom},\n\n${resume}\n\n${url}\n${piedAlerte().texte}`,
+    entetes: piedAlerte().entetes,
   }
 }

@@ -27,7 +27,9 @@ dès l'ouverture publique, car l'offre gratuite s'endort après 15 minutes et co
 1. *New → Blueprint* → dépôt GitHub `entre-transporteurs` (il lit `render.yaml`).
 2. Renseignez les variables marquées « sync: false » :
    `DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_URL` (l'URL HTTPS finale, ex. `https://entre-transporteurs.onrender.com`),
-   les informations légales `EDITEUR_*` / `EMAIL_CONTACT`, et `RESEND_API_KEY` / `EMAIL_FROM`.
+   les informations légales (`EDITEUR_NOM`, `EDITEUR_ADRESSE`, `EDITEUR_SIRET`, `EDITEUR_DIRECTEUR`, `EMAIL_CONTACT`), et `RESEND_API_KEY` / `EMAIL_FROM`.
+   Les champs facultatifs (`EDITEUR_FORME`, `EDITEUR_RCS`, `EDITEUR_TVA`, `EDITEUR_TELEPHONE`) s'ajoutent ensuite dans *Environment*.
+   Tout le détail (quoi mettre, selon votre statut) est dans [JURIDIQUE.md](JURIDIQUE.md).
    `NEXTAUTH_SECRET` est généré automatiquement.
 3. Le build applique automatiquement les migrations (`prisma migrate deploy`).
 4. Vérifiez `https://VOTRE-URL/api/sante` → `{"statut":"ok"}`.
@@ -56,7 +58,7 @@ Si vous l'avez fait par erreur : `npm run demo:nettoyer -- --oui`.
 
 ## 6. Check-list avant d'ouvrir au public
 
-- [ ] Informations légales renseignées (sinon les pages affichent « [à compléter] »), CGU et confidentialité **relues par un juriste**
+- [ ] Informations légales renseignées (sinon les pages affichent « [à compléter] »), CGU et confidentialité **relues par un juriste** — voir [JURIDIQUE.md](JURIDIQUE.md)
 - [ ] `NEXT_PUBLIC_DEMO_MODE` **absent** (pas de connexion en un clic)
 - [ ] Aucune donnée de démonstration en base
 - [ ] Domaine en HTTPS, `NEXTAUTH_URL` identique, e-mail de test reçu (inscription → lien de confirmation)
@@ -65,13 +67,19 @@ Si vous l'avez fait par erreur : `npm run demo:nettoyer -- --oui`.
 - [ ] Plan Render **Starter** (pas d'endormissement)
 - [ ] Sauvegardes : activer les sauvegardes Supabase (offre Pro) ou planifier un `pg_dump` hebdomadaire
 - [ ] Supervision : un moniteur gratuit (UptimeRobot) sur `/api/sante`
+- [ ] Purge des données expirées (journal > 12 mois, jetons) : automatique chaque jour dans l'application — avec **plusieurs instances**, la planifier une seule fois à part
 - [ ] `npm run verif:securite` passé **sur un environnement de test** (jamais sur la production)
 
 ## 7. Faire payer plus tard
 
 Rien à changer dans le code : créer le produit Stripe (69 €/mois), puis ajouter `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`,
-`STRIPE_WEBHOOK_SECRET` (webhook → `https://VOTRE-URL/api/stripe/webhook`). Les commissionnaires seront alors soumis à
-l'abonnement ; les transporteurs restent gratuits. **Prévenez vos utilisateurs 30 jours avant** (engagement pris dans les CGU).
+`STRIPE_WEBHOOK_SECRET` (webhook → `https://VOTRE-URL/api/stripe/webhook`) **et `FACTURATION_A_PARTIR_DU`** (ex. `2027-01-15`).
+
+1. **Annoncez** le paiement à vos commissionnaires (e-mail) au moins 30 jours avant la date choisie : engagement pris dans les CGU.
+2. Jusqu'à cette date l'accès reste gratuit et un bandeau « L'accès deviendra payant le … » s'affiche à chaque commissionnaire.
+3. À cette date, chacun reçoit **30 jours d'essai sans carte**, puis doit s'abonner. Les transporteurs restent gratuits.
+
+Le serveur refuse de démarrer si Stripe est configuré sans `FACTURATION_A_PARTIR_DU` (sinon tous les essais seraient déjà expirés).
 
 ## 8. Mises à jour
 

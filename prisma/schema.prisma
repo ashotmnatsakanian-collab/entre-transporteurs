@@ -84,6 +84,8 @@ model User {
 
   emailVerifieLe DateTime?
   cguAccepteesLe DateTime?
+  // Version des CGU acceptée (voir VERSION_CGU dans src/lib/legal.ts) : une nouvelle version redemande l'acceptation
+  cguVersion     String?
   // Compte suspendu par un administrateur : connexion et sessions refusées
   suspendu       Boolean   @default(false)
   alertesEmail   Boolean   @default(true)

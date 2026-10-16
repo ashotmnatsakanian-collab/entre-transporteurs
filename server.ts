@@ -4,6 +4,7 @@ import { loadEnvConfig } from '@next/env'
 import { verifierEnvironnement } from './src/lib/env'
 import { initSocketServer } from './src/lib/socket-server'
 import { db } from './src/lib/db'
+import { planifierPurge } from './src/lib/purge'
 import { log, messageErreur } from './src/lib/logger'
 
 const dev = process.env.NODE_ENV !== 'production'
@@ -34,6 +35,7 @@ app.prepare().then(() => {
   httpServer.maxHeadersCount = 100
 
   initSocketServer(httpServer)
+  planifierPurge()
 
   httpServer.listen(port, hostname, () => {
     console.log(`▶  Ready on http://${hostname}:${port}`)

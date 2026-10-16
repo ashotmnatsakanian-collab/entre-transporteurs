@@ -1,11 +1,13 @@
 import { db } from '@/lib/db'
 import { stripe } from '@/lib/stripe'
 import { urlApplication } from '@/lib/email'
+import { facturationActive } from '@/lib/facturation'
 import { ApiError, exigerUtilisateur, gerer, json, limiter } from '@/lib/api'
 
 // POST /api/stripe/checkout — souscrire (commissionnaires uniquement)
 export const POST = gerer(async (req) => {
   if (!stripe || !process.env.STRIPE_PRICE_ID) throw new ApiError(501, 'Le paiement en ligne est désactivé pendant la période de lancement.')
+  if (!facturationActive()) throw new ApiError(409, "Le paiement n'est pas encore ouvert : votre accès reste gratuit pour le moment.")
   const u = await exigerUtilisateur('COMMISSIONNAIRE')
   limiter(req, 'checkout', 10, 60 * 60_000, u.id)
 

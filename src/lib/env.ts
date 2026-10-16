@@ -27,6 +27,13 @@ export function verifierEnvironnement(): void {
   if (estProduction && !url.startsWith('https://') && !local) {
     problemes.push('NEXTAUTH_URL doit utiliser https:// en production')
   }
+  if (process.env.STRIPE_SECRET_KEY && !process.env.FACTURATION_A_PARTIR_DU) {
+    // Sans date, tous les essais seraient déjà expirés au premier jour : les CGU promettent un préavis de 30 jours
+    problemes.push("FACTURATION_A_PARTIR_DU est requis quand Stripe est configuré (ex. 2027-01-15, au moins 30 jours après l'annonce aux utilisateurs)")
+  }
+  if (process.env.FACTURATION_A_PARTIR_DU && Number.isNaN(new Date(process.env.FACTURATION_A_PARTIR_DU).getTime())) {
+    problemes.push('FACTURATION_A_PARTIR_DU doit être une date valide (AAAA-MM-JJ)')
+  }
   if (estProduction && process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && !process.env.AUTORISER_MODE_DEMO) {
     console.warn('⚠️  Mode démonstration actif : connexion en un clic avec des comptes publics. Ne pas utiliser sur un site réel.')
   }

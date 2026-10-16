@@ -6,9 +6,9 @@ Il ne remplace pas un audit externe avant une montée en charge.
 ## Vérifier en 2 commandes
 
 ```bash
-npm test                    # 27 tests unitaires (SIRET, limitation de débit, IP, validations…)
+npm test                    # 38 tests unitaires (SIRET, limitation de débit, IP, validations, facturation, durées de conservation…)
 npm run dev                 # dans un terminal…
-npm run verif:securite      # …puis dans un autre : ~136 attaques rejouées contre l'application
+npm run verif:securite      # …puis dans un autre : ~149 contrôles rejoués contre l'application
 ```
 
 `verif:securite` joue le rôle d'un attaquant (visiteur anonyme, mauvais rôle, accès aux ressources d'autrui,
@@ -30,8 +30,9 @@ Il crée puis supprime ses propres comptes : ne le lancez jamais contre la base 
 | **Temps réel** | WebSocket authentifié par le **cookie de session signé** (l'identité déclarée par le client est ignorée) ; rooms de conversation réservées aux participants ; flux « annonces/carte » réservés aux commissionnaires autorisés, « besoins » aux transporteurs ; plafonds de messages et de taille |
 | **Abus** | Limitation de débit par route (inscription, connexion, recherche, publication, messages, avis…), plafonds métier (annonces actives, véhicules, alertes), jeton de réinitialisation à usage unique (haché en base, 1 h) |
 | **Comptes** | Réinitialisation et vérification d'e-mail par jetons ; consentement CGU horodaté ; export RGPD ; suppression avec anonymisation ; signalement d'utilisateurs ; suspension par l'admin |
-| **Confiance** | Badge « SIRET vérifié » = établissement **existant et actif** au répertoire officiel de l'État (API `recherche-entreprises`), jamais une certification de licence de transport |
-| **Audit** | Journal de sécurité en base (connexions, échecs, verrouillages, réinitialisations, actions admin, signalements) consultable dans `/admin/journal` |
+| **Confiance** | Badge « SIRET vérifié » = établissement **existant et actif** au répertoire officiel de l'État (API `recherche-entreprises`), jamais une certification de licence de transport ; l'admin ne peut que le retirer, pas l'accorder |
+| **Juridique** | CGU versionnées (nouvelle acceptation à chaque changement), e-mails d'alerte désactivables — voir [JURIDIQUE.md](JURIDIQUE.md) |
+| **Audit** | Journal de sécurité en base (connexions, échecs, verrouillages, réinitialisations, actions admin, signalements, acceptations des CGU) consultable dans `/admin/journal` ; purgé automatiquement après 12 mois |
 | **Infra** | Validation de l'environnement au démarrage (le serveur **refuse** de démarrer en production avec un secret faible ou une URL non HTTPS), délais HTTP serrés, arrêt propre, erreurs sans stack ni détail interne |
 | **Dépendances** | `npm audit --omit=dev` : 0 vulnérabilité (Next 15.5, React 19, next-auth 4.24.15) |
 

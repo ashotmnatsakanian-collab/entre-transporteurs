@@ -18,7 +18,7 @@ export const GET = gerer(async (req) => {
     where: { id: u.id },
     select: {
       id: true, email: true, nom: true, telephone: true, role: true, verifie: true, createdAt: true,
-      emailVerifieLe: true, cguAccepteesLe: true, alertesEmail: true,
+      emailVerifieLe: true, cguAccepteesLe: true, cguVersion: true, alertesEmail: true,
       transporteurProfil: { include: { vehicules: true, annonces: true, avis: true } },
       commissionnaireProfil: { include: { besoins: true } },
       abonnement: { select: { statut: true, dateFinEssai: true, dateFinPeriode: true, createdAt: true } },

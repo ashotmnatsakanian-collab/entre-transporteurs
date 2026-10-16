@@ -2,7 +2,7 @@
 
 Bourse de fret « inversée » : les **transporteurs** publient gratuitement leurs disponibilités (trajets retour, véhicule libre), les **commissionnaires de transport** les trouvent en direct — ou publient un *besoin de transport* auquel les transporteurs proches répondent.
 
-**Documentation** : [DEPLOIEMENT.md](DEPLOIEMENT.md) (mise en ligne pas à pas) · [SECURITE.md](SECURITE.md) (protections, vérification, limites)
+**Documentation** : [DEPLOIEMENT.md](DEPLOIEMENT.md) (mise en ligne pas à pas) · [SECURITE.md](SECURITE.md) (protections, vérification, limites) · [JURIDIQUE.md](JURIDIQUE.md) (mentions légales, CGU, RGPD, démarches)
 
 ```bash
 npm install
@@ -11,7 +11,7 @@ npx prisma migrate deploy         # crée les tables
 npm run db:seed                   # données de démonstration (LOCAL uniquement)
 npm run dev                       # http://localhost:3000
 npm test                          # tests unitaires
-npm run verif:securite            # ~136 attaques rejouées contre l'application (serveur lancé)
+npm run verif:securite            # ~149 contrôles rejoués contre l'application (serveur lancé)
 ```
 
 ---
