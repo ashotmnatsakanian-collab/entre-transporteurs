@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { exigerRoleOuRediriger } from '@/lib/garde'
 import { getIO } from '@/lib/socket-server'
 import { FilDiscussion } from '@/components/messagerie/FilDiscussion'
+import { PanneauDocumentsInterlocuteur } from '@/components/documents/PanneauDocumentsInterlocuteur'
 
 export default async function ConversationPage({ params }: { params: Promise<{ conversationId: string }> }) {
   const { conversationId } = await params
@@ -33,11 +34,21 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
 
   const interlocuteur = conversation.participants.find((p) => p.userId !== u.id)?.user
 
+  // Documents légaux de l'interlocuteur : statut toujours visible, fichiers seulement s'il en a autorisé le partage
+  const autre = interlocuteur ? await db.user.findUnique({ where: { id: interlocuteur.id }, select: { partageDocuments: true, documents: { select: { id: true, type: true, statut: true, dateExpiration: true } } } }) : null
+
   return (
-    <FilDiscussion
-      conversation={JSON.parse(JSON.stringify({ ...conversation, messages }))}
-      currentUser={{ id: u.id, nom: u.nom }}
-      interlocuteur={interlocuteur ? JSON.parse(JSON.stringify(interlocuteur)) : null}
-    />
+    <div className="flex flex-col h-full">
+      {interlocuteur && autre && (
+        <PanneauDocumentsInterlocuteur nom={interlocuteur.nom} role={interlocuteur.role} documents={autre.documents} peutTelecharger={autre.partageDocuments} />
+      )}
+      <div className="flex-1 min-h-0">
+        <FilDiscussion
+          conversation={JSON.parse(JSON.stringify({ ...conversation, messages }))}
+          currentUser={{ id: u.id, nom: u.nom }}
+          interlocuteur={interlocuteur ? JSON.parse(JSON.stringify(interlocuteur)) : null}
+        />
+      </div>
+    </div>
   )
 }

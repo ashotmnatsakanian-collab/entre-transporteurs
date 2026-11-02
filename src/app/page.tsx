@@ -15,7 +15,7 @@ export default async function Home() {
 
   const valide = {
     active: true,
-    transporteur: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() },
+    transporteur: { user: { suspendu: false, supprimeLe: null, ...filtreConforme() } },
     OR: [
       { dateDisponibiliteFin: { gte: new Date() } },
       { AND: [{ dateDisponibiliteFin: null }, { dateDisponibilite: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
@@ -31,7 +31,7 @@ export default async function Home() {
   })
 
   const [nbTransporteurs, nbAnnoncesActives, nbCommissionnaires] = await Promise.all([
-    db.transporteurProfil.count({ where: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() } }),
+    db.transporteurProfil.count({ where: { user: { suspendu: false, supprimeLe: null, ...filtreConforme() } } }),
     db.annonce.count({ where: valide }),
     db.commissionnaireProfil.count(),
   ])

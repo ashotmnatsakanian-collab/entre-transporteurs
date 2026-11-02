@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { recalculerConformite } from '@/lib/documents'
-import { DOCUMENTS } from '@/lib/documents-regles'
+import { definition, roleAvecDocuments } from '@/lib/documents-regles'
 import { emailDocumentDecision, envoyerEmail, urlApplication } from '@/lib/email'
 import { journaliser } from '@/lib/journal'
 import { ipClient } from '@/lib/ip'
@@ -19,17 +19,14 @@ export const PATCH = gerer<{ params: Promise<{ id: string }> }>(async (req, { pa
   limiter(req, 'admin-documents', 300, 60 * 60_000, admin.id)
   const decision = await lireJson(req, schema)
 
-  const doc = await db.documentTransporteur.findUnique({
+  const doc = await db.document.findUnique({
     where: { id },
-    select: {
-      id: true, type: true, dateExpiration: true, transporteurId: true,
-      transporteur: { select: { user: { select: { email: true, nom: true, supprimeLe: true } } } },
-    },
+    select: { id: true, type: true, dateExpiration: true, userId: true, user: { select: { email: true, nom: true, role: true, supprimeLe: true } } },
   })
-  if (!doc || doc.transporteur.user.supprimeLe) throw new ApiError(404, 'Document introuvable')
+  if (!doc || doc.user.supprimeLe) throw new ApiError(404, 'Document introuvable')
   if (decision.statut === 'VALIDE' && doc.dateExpiration <= new Date()) throw new ApiError(409, 'Ce document est expiré : refusez-le.')
 
-  await db.documentTransporteur.update({
+  await db.document.update({
     where: { id },
     data: {
       statut: decision.statut,
@@ -38,13 +35,19 @@ export const PATCH = gerer<{ params: Promise<{ id: string }> }>(async (req, { pa
       verifieLe: new Date(),
     },
   })
-  await recalculerConformite(doc.transporteurId)
+  await recalculerConformite(doc.userId)
   await journaliser('admin_action', { userId: admin.id, ip: ipClient(req.headers), details: `document ${doc.type} ${decision.statut} -> ${id}` })
 
-  const user = doc.transporteur.user
+  const role = roleAvecDocuments(doc.user.role) ?? 'TRANSPORTEUR'
   await envoyerEmail({
-    ...emailDocumentDecision(user.nom, DOCUMENTS[doc.type].libelle, decision.statut === 'VALIDE', decision.statut === 'REFUSE' ? decision.motif : null, urlApplication('/transporteur/documents')),
-    to: user.email,
+    ...emailDocumentDecision(
+      doc.user.nom,
+      definition(doc.type, role).libelle,
+      decision.statut === 'VALIDE',
+      decision.statut === 'REFUSE' ? decision.motif : null,
+      urlApplication(`/${role === 'COMMISSIONNAIRE' ? 'commissionnaire' : 'transporteur'}/documents`)
+    ),
+    to: doc.user.email,
   })
   return json({ success: true })
 })

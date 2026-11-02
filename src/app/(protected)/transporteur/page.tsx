@@ -5,7 +5,7 @@ import { DisponibiliteToggle } from '@/components/carte/DisponibiliteToggle'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 import { exigerDocuments } from '@/lib/documents'
-import { TYPES_OBLIGATOIRES, calculerConformite } from '@/lib/documents-regles'
+import { OBLIGATOIRES_PAR_ROLE, calculerConformite } from '@/lib/documents-regles'
 
 export default async function DashboardTransporteurPage() {
   const u = await exigerRoleOuRediriger('TRANSPORTEUR')
@@ -33,8 +33,8 @@ export default async function DashboardTransporteurPage() {
     : [0, null]
 
   const nbAnnoncesTotal = profil ? await db.annonce.count({ where: { transporteurId: profil.id } }) : 0
-  const documents = profil ? await db.documentTransporteur.findMany({ where: { transporteurId: profil.id }, select: { type: true, statut: true, dateExpiration: true } }) : []
-  const conforme = calculerConformite(documents) !== null
+  const documents = profil ? await db.document.findMany({ where: { userId: u.id }, select: { type: true, statut: true, dateExpiration: true } }) : []
+  const conforme = calculerConformite(documents, 'TRANSPORTEUR') !== null
   const nbDocsValides = documents.filter((d) => d.statut === 'VALIDE' && d.dateExpiration > new Date()).length
   const documentsExiges = exigerDocuments()
   const profilComplet =
@@ -42,7 +42,7 @@ export default async function DashboardTransporteurPage() {
   const etapes = [
     { fait: profilComplet, label: 'Complétez votre profil (SIRET et ville de base)', href: '/transporteur/profil', action: 'Compléter' },
     { fait: (profil?.vehicules.length ?? 0) > 0, label: 'Ajoutez votre premier véhicule', href: '/transporteur/flotte/nouveau', action: 'Ajouter' },
-    ...(documentsExiges ? [{ fait: conforme, label: `Documents légaux validés : ${nbDocsValides}/${TYPES_OBLIGATOIRES.length} (Kbis, licence, vigilance…)`, href: '/transporteur/documents', action: 'Déposer' }] : []),
+    ...(documentsExiges ? [{ fait: conforme, label: `Documents légaux validés : ${nbDocsValides}/${OBLIGATOIRES_PAR_ROLE.TRANSPORTEUR.length} (Kbis, licence, vigilance…)`, href: '/transporteur/documents', action: 'Déposer' }] : []),
     { fait: nbAnnoncesTotal > 0, label: 'Publiez une disponibilité pour être trouvé', href: '/transporteur/annonces', action: 'Publier' },
   ]
   const onboardingTermine = etapes.every((e) => e.fait)

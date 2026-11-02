@@ -22,6 +22,7 @@ const LIENS_COMMISSIONNAIRE = [
   { href: '/carte', label: 'La carte', icon: '🗺️' },
   { href: '/messages', label: 'Messages', icon: '💬' },
   { href: '/commissionnaire/profil', label: 'Mon profil', icon: '👤' },
+  { href: '/commissionnaire/documents', label: 'Mes documents', icon: '📑' },
   { href: '/abonnement/tarification', label: 'Abonnement', icon: '💳' },
 ]
 

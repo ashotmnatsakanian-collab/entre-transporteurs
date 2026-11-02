@@ -6,7 +6,7 @@ import { authOptions } from './auth'
 import { db } from './db'
 import { emailActif } from './email'
 import { aAccesPayant } from './acces'
-import { transporteurEstConforme } from './documents'
+import { utilisateurEstConforme } from './documents'
 import { VERSION_CGU } from './legal'
 import { consommer } from './rate-limit'
 import { ipClient } from './ip'
@@ -178,12 +178,13 @@ export async function exigerUtilisateur(...roles: Role[]): Promise<Utilisateur> 
 export async function exigerAccesCommissionnaire(): Promise<Utilisateur> {
   const u = await exigerUtilisateur('COMMISSIONNAIRE')
   if (!(await aAccesPayant(u.id))) throw new ApiError(402, 'Abonnement requis', { code: 'ABONNEMENT_REQUIS' })
+  await exigerConformite(u.id)
   return u
 }
 
-/** Publier, se déclarer disponible ou ouvrir une conversation exige des documents validés (quand ils sont exigés). */
-export async function exigerTransporteurConforme(userId: string): Promise<void> {
-  if (!(await transporteurEstConforme(userId))) {
+/** Documents légaux validés (quand ils sont exigés) : condition pour publier, se déclarer disponible, chercher ou contacter. */
+export async function exigerConformite(userId: string): Promise<void> {
+  if (!(await utilisateurEstConforme(userId))) {
     throw new ApiError(403, 'Vos documents légaux doivent être validés avant cette action. Rendez-vous dans « Mes documents ».', { code: 'DOCUMENTS_REQUIS' })
   }
 }

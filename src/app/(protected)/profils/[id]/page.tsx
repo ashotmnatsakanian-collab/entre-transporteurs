@@ -22,7 +22,7 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
     where: { id, user: { suspendu: false, supprimeLe: null } },
     include: {
       // Pas d'e-mail : la prise de contact passe par la messagerie
-      user: { select: { id: true, nom: true, telephone: true, createdAt: true, verifie: true } },
+      user: { select: { id: true, nom: true, telephone: true, createdAt: true, verifie: true, partageDocuments: true } },
       vehicules: { where: { actif: true }, orderBy: { type: 'asc' } },
     },
   })
@@ -37,11 +37,11 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
   let documents: Array<{ id: string; type: import('@prisma/client').TypeDocument; statut: import('@prisma/client').StatutDocument; dateExpiration: Date }> = []
   let peutTelecharger = false
   if (u.role === 'COMMISSIONNAIRE') {
-    documents = await db.documentTransporteur.findMany({ where: { transporteurId: profil.id }, select: { id: true, type: true, statut: true, dateExpiration: true } })
+    documents = await db.document.findMany({ where: { userId: profil.user.id }, select: { id: true, type: true, statut: true, dateExpiration: true } })
     peutTelecharger =
-      profil.partageDocuments && !!(await db.conversation.findUnique({ where: { cle: paireCle(u.id, profil.user.id) }, select: { id: true } }))
+      profil.user.partageDocuments && !!(await db.conversation.findUnique({ where: { cle: paireCle(u.id, profil.user.id) }, select: { id: true } }))
   }
-  const conforme = calculerConformite(documents) !== null
+  const conforme = calculerConformite(documents, 'TRANSPORTEUR') !== null
 
   const agregatAvis = await db.avis.aggregate({ where: { transporteurId: profil.id }, _avg: { note: true }, _count: true })
 
@@ -103,7 +103,7 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
         )}
       </div>
 
-      {u.role === 'COMMISSIONNAIRE' && <ResumeDocuments documents={documents} conforme={conforme} peutTelecharger={peutTelecharger} />}
+      {u.role === 'COMMISSIONNAIRE' && <ResumeDocuments role="TRANSPORTEUR" documents={documents} conforme={conforme} peutTelecharger={peutTelecharger} />}
 
       {u.role === 'COMMISSIONNAIRE' && <SectionAvis transporteurId={profil.id} peutNoter={peutNoter} />}
 

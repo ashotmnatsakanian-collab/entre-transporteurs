@@ -41,6 +41,7 @@ enum TypeDocument {
   VIGILANCE_URSSAF
   REGULARITE_FISCALE
   ASSURANCE
+  REGISTRE_COMMISSIONNAIRE
 }
 
 enum StatutDocument {
@@ -108,6 +109,12 @@ model User {
   // Les sessions ouvertes avant cette date sont invalidées (changement / réinitialisation du mot de passe)
   motDePasseChangeLe DateTime?
 
+  // Documents légaux — conformité : date jusqu'à laquelle TOUS les documents obligatoires du rôle sont validés
+  // (null = non conforme). Recalculée à chaque validation, remplacement, suppression ou expiration.
+  documentsConformesJusqua DateTime?
+  // Autorise l'autre partie d'une conversation à télécharger mes documents validés
+  partageDocuments         Boolean   @default(false)
+
   transporteurProfil    TransporteurProfil?
   commissionnaireProfil CommissionnaireProfil?
   abonnement            Abonnement?
@@ -118,6 +125,9 @@ model User {
   signalementsEmis      Signalement[]             @relation("signalant")
   signalementsRecus     Signalement[]             @relation("signale")
   alertes               Alerte[]
+  documents             Document[]
+
+  @@index([documentsConformesJusqua])
 }
 
 // ─── Profils ──────────────────────────────────────────────────────────────────
@@ -144,23 +154,15 @@ model TransporteurProfil {
   disponible  Boolean  @default(false)
   derniereMAJ DateTime @default(now())
 
-  // Conformité : date jusqu'à laquelle TOUS les documents obligatoires sont validés (null = non conforme).
-  // Recalculée à chaque validation, remplacement ou suppression de document.
-  documentsConformesJusqua DateTime?
-  // Le transporteur autorise les commissionnaires avec qui il échange à télécharger ses documents validés
-  partageDocuments         Boolean   @default(false)
-
   vehicules Vehicule[]
   annonces  Annonce[]
   avis      Avis[]
-  documents DocumentTransporteur[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([latitude, longitude])
   @@index([disponible])
-  @@index([documentsConformesJusqua])
 }
 
 model CommissionnaireProfil {
@@ -418,14 +420,14 @@ model JournalSecurite {
   @@index([userId, createdAt])
 }
 
-// ─── Documents légaux du transporteur ─────────────────────────────────────────
-// Un seul document courant par type (le remplacer repasse en attente de validation).
+// ─── Documents légaux (transporteurs et commissionnaires) ─────────────────────
+// Un seul document courant par type et par utilisateur (le remplacer repasse en attente de validation).
 // Le contenu est stocké chiffré (AES-256-GCM) dans une table séparée pour ne jamais être chargé par accident.
 
-model DocumentTransporteur {
-  id             String             @id @default(cuid())
-  transporteurId String
-  transporteur   TransporteurProfil @relation(fields: [transporteurId], references: [id], onDelete: Cascade)
+model Document {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   type   TypeDocument
   statut StatutDocument @default(EN_ATTENTE)
@@ -448,13 +450,13 @@ model DocumentTransporteur {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([transporteurId, type])
+  @@unique([userId, type])
   @@index([statut])
   @@index([dateExpiration])
 }
 
 model DocumentContenu {
-  documentId String               @id
-  document   DocumentTransporteur @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String   @id
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   donnees    Bytes // version(1) | iv(12) | tag(16) | texte chiffré
 }

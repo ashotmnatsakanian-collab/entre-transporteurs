@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StatutDocument, TypeDocument } from '@prisma/client'
-import { DOCUMENTS, FORMATS_ACCEPTES, LIBELLE_STATUT, TAILLE_MAX_OCTETS, TYPES_DOCUMENTS, statutEffectif } from '@/lib/documents-regles'
+import { FORMATS_ACCEPTES, LIBELLE_STATUT, OBLIGATOIRES_PAR_ROLE, TAILLE_MAX_OCTETS, TYPES_PAR_ROLE, definition, statutEffectif, type RoleAvecDocuments } from '@/lib/documents-regles'
 
 interface Doc {
   id: string
@@ -15,6 +15,7 @@ interface Doc {
 }
 
 interface Props {
+  role: RoleAvecDocuments
   documents: Doc[]
   partage: boolean
   exiges: boolean
@@ -31,9 +32,10 @@ const STYLE_STATUT: Record<string, string> = {
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10)
 
-function CarteDocument({ type, doc }: { type: TypeDocument; doc?: Doc }) {
+function CarteDocument({ type, doc, role }: { type: TypeDocument; doc?: Doc; role: RoleAvecDocuments }) {
   const router = useRouter()
-  const def = DOCUMENTS[type]
+  const def = definition(type, role)
+  const obligatoire = OBLIGATOIRES_PAR_ROLE[role].includes(type)
   const statut = statutEffectif(doc, new Date())
   const [fichier, setFichier] = useState<File | null>(null)
   const [date, setDate] = useState('')
@@ -75,7 +77,7 @@ function CarteDocument({ type, doc }: { type: TypeDocument; doc?: Doc }) {
   return (
     <li className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h2 className="font-semibold text-slate-900">{def.libelle}</h2>
+        <h2 className="font-semibold text-slate-900">{def.libelle}{!obligatoire && <span className="ml-2 text-xs font-normal text-slate-600">(recommandé)</span>}</h2>
         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STYLE_STATUT[statut]}`}>{LIBELLE_STATUT[statut]}</span>
       </div>
       <p className="text-sm text-slate-700 mt-1">{def.description}</p>
@@ -138,10 +140,11 @@ function CarteDocument({ type, doc }: { type: TypeDocument; doc?: Doc }) {
   )
 }
 
-export function GestionDocuments({ documents, partage: partageInitial, exiges, conforme }: Props) {
+export function GestionDocuments({ role, documents, partage: partageInitial, exiges, conforme }: Props) {
   const router = useRouter()
   const [partage, setPartage] = useState(partageInitial)
-  const valides = TYPES_DOCUMENTS.filter((t) => statutEffectif(documents.find((d) => d.type === t), new Date()) === 'VALIDE').length
+  const obligatoires = OBLIGATOIRES_PAR_ROLE[role]
+  const valides = obligatoires.filter((t) => statutEffectif(documents.find((d) => d.type === t), new Date()) === 'VALIDE').length
 
   async function changerPartage(valeur: boolean) {
     setPartage(valeur)
@@ -153,19 +156,23 @@ export function GestionDocuments({ documents, partage: partageInitial, exiges, c
   return (
     <div className="space-y-5">
       <div className={`rounded-xl p-4 text-sm ${conforme ? 'bg-green-50 border border-green-200 text-green-900' : 'bg-amber-50 border border-amber-200 text-amber-900'}`} role="status">
-        <p className="font-semibold">{valides} document(s) validé(s) sur {TYPES_DOCUMENTS.length}</p>
+        <p className="font-semibold">{valides} document(s) obligatoire(s) validé(s) sur {obligatoires.length}</p>
         <p className="mt-1">
           {conforme
-            ? 'Votre dossier est complet : vous êtes visible des commissionnaires.'
+            ? role === 'TRANSPORTEUR' ? 'Votre dossier est complet : vous êtes visible des commissionnaires.' : 'Votre dossier est complet : vous avez accès à la recherche, à la carte et à la publication de besoins.'
             : exiges
-              ? "Tant que les cinq documents ne sont pas validés, vous restez invisible des commissionnaires et ne pouvez ni publier de disponibilité ni ouvrir de conversation."
-              : "Les documents ne sont pas encore obligatoires, mais les commissionnaires les demanderont : préparez-les dès maintenant."}
+              ? role === 'TRANSPORTEUR'
+                ? 'Tant que les documents obligatoires ne sont pas validés, vous restez invisible des commissionnaires et ne pouvez ni publier de disponibilité ni ouvrir de conversation.'
+                : 'Tant que les documents obligatoires ne sont pas validés, vous n\'avez accès ni à la recherche, ni à la carte, et ne pouvez ni publier de besoin ni ouvrir de conversation.'
+              : role === 'TRANSPORTEUR'
+                ? 'Les documents ne sont pas encore obligatoires, mais les commissionnaires les demanderont : préparez-les dès maintenant.'
+                : 'Les documents ne sont pas encore obligatoires, mais ils le deviendront : préparez-les dès maintenant.'}
         </p>
       </div>
 
       <ul className="space-y-4">
-        {TYPES_DOCUMENTS.map((type) => (
-          <CarteDocument key={`${type}-${documents.find((d) => d.type === type)?.id ?? 'nouveau'}`} type={type} doc={documents.find((d) => d.type === type)} />
+        {TYPES_PAR_ROLE[role].map((type) => (
+          <CarteDocument key={`${type}-${documents.find((d) => d.type === type)?.id ?? 'nouveau'}`} role={role} type={type} doc={documents.find((d) => d.type === type)} />
         ))}
       </ul>
 
@@ -173,9 +180,9 @@ export function GestionDocuments({ documents, partage: partageInitial, exiges, c
         <label className="flex items-start gap-3 text-sm text-slate-800 cursor-pointer">
           <input type="checkbox" checked={partage} onChange={(e) => changerPartage(e.target.checked)} className="mt-1 h-5 w-5" />
           <span>
-            <span className="font-medium">Autoriser le téléchargement par les commissionnaires avec qui j'échange</span>
+            <span className="font-medium">Autoriser le téléchargement par {role === 'TRANSPORTEUR' ? 'les commissionnaires' : 'les transporteurs'} avec qui j'échange</span>
             <span className="block text-slate-600 mt-0.5">
-              Ils pourront télécharger vos documents <strong>validés</strong> (utile pour leurs propres obligations de vigilance). Les autres ne voient que le statut. Vous pouvez retirer cet accord à tout moment ;
+              {role === 'TRANSPORTEUR' ? 'Ils' : 'Ils'} pourront télécharger vos documents <strong>validés</strong> (utile pour leurs propres obligations de vigilance). Les autres ne voient que le statut. Vous pouvez retirer cet accord à tout moment ;
               chaque téléchargement est enregistré.
             </span>
           </span>
@@ -183,7 +190,7 @@ export function GestionDocuments({ documents, partage: partageInitial, exiges, c
       </div>
 
       <p className="text-xs text-slate-600">
-        Vos documents sont chiffrés, visibles uniquement de l'équipe de vérification et, si vous l'autorisez, des commissionnaires avec qui vous échangez.
+        Vos documents sont chiffrés, visibles uniquement de l'équipe de vérification et, si vous l'autorisez, de l'autre partie de vos conversations.
         Voir la politique de confidentialité.
       </p>
     </div>

@@ -28,7 +28,7 @@ export default async function AdminPage() {
     db.besoin.count({ where: { active: true, dateEnlevement: { gte: new Date(Date.now() - 86_400_000) } } }),
     db.signalement.count({ where: { statut: 'OUVERT' } }),
     db.journalSecurite.count({ where: { type: 'connexion_echec', createdAt: { gte: il24h } } }),
-    db.documentTransporteur.count({ where: { statut: 'EN_ATTENTE' } }),
+    db.document.count({ where: { statut: 'EN_ATTENTE' } }),
   ])
 
   return (

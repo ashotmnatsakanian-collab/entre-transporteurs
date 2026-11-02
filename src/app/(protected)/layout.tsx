@@ -2,13 +2,18 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { utilisateurCourant } from '@/lib/api'
 import { Navbar } from '@/components/ui/Navbar'
 import { Sidebar } from '@/components/ui/Sidebar'
 import { BanniereEssai } from '@/components/abonnement/BanniereEssai'
 import { BanniereEmail } from '@/components/ui/BanniereEmail'
 import { BanniereFacturation } from '@/components/abonnement/BanniereFacturation'
+import { exigerDocuments, utilisateurEstConforme } from '@/lib/documents'
 import { facturationActive, facturationAnnoncee, finEssaiEffective, joursRestants } from '@/lib/facturation'
+
+// Pages qui exposent des transporteurs ou permettent de les contacter (l'API applique la même règle)
+const CHEMINS_RESERVES_AUX_CONFORMES = ['/carte', '/commissionnaire/recherche', '/commissionnaire/besoins', '/commissionnaire/annonces', '/profils']
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -19,6 +24,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   if (!user) redirect('/deconnexion')
   // CGU mises à jour depuis la dernière acceptation : à relire et accepter avant de continuer
   if (!user.cguAcceptees) redirect('/accepter-cgu')
+
+  // Documents légaux : un commissionnaire non conforme n'accède ni à la recherche, ni à la carte, ni aux besoins
+  if (user.role === 'COMMISSIONNAIRE' && exigerDocuments() && !(await utilisateurEstConforme(user.id))) {
+    const chemin = (await headers()).get('x-chemin') ?? ''
+    if (CHEMINS_RESERVES_AUX_CONFORMES.some((p) => chemin === p || chemin.startsWith(`${p}/`))) redirect('/commissionnaire/documents')
+  }
 
   // Gating d'abonnement : commissionnaires uniquement, une fois la facturation ouverte
   let joursRestantsEssai: number | null = null

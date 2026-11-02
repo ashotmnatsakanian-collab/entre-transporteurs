@@ -48,8 +48,8 @@ dès l'ouverture publique, car l'offre gratuite s'endort après 15 minutes et co
 ## 4 bis. Documents légaux des transporteurs
 
 - `DOCUMENTS_CLE` : clé qui chiffre les fichiers (Render la génère). **Copiez-la dans votre gestionnaire de mots de passe** : sans elle, les documents sont perdus.
-- `EXIGER_DOCUMENTS=true` (déjà dans `render.yaml`) : un transporteur sans documents validés reste invisible. Mettre `false` pour un lancement sans cette exigence.
-- Chaque jour, le serveur supprime les documents périmés selon les durées de la politique de confidentialité et prévient par e-mail les transporteurs 30 jours avant l'expiration d'un document.
+- `EXIGER_DOCUMENTS=true` (déjà dans `render.yaml`) : un transporteur sans documents validés reste invisible et un commissionnaire n'a pas accès à la recherche. Mettre `false` pour un lancement sans cette exigence.
+- Chaque jour, le serveur supprime les documents périmés selon les durées de la politique de confidentialité et prévient par e-mail les utilisateurs 30 jours avant l'expiration d'un document.
 - Votre travail : valider les dépôts dans `/admin/documents` (voir `JURIDIQUE.md`).
 
 ## 5. Premier administrateur

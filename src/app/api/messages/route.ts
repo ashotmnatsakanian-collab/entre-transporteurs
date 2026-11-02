@@ -2,8 +2,8 @@ import { db } from '@/lib/db'
 import { messageCreationSchema } from '@/lib/validations/divers'
 import { paireCle, trouverOuCreerConversation } from '@/lib/conversations'
 import { aAccesPayant } from '@/lib/acces'
-import { transporteurEstConforme } from '@/lib/documents'
-import { ApiError, exigerEmailVerifie, exigerTransporteurConforme, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
+import { utilisateurEstConforme } from '@/lib/documents'
+import { ApiError, exigerEmailVerifie, exigerConformite, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
 // GET /api/messages — mes conversations (avec le nombre de messages non lus)
 export const GET = gerer(async () => {
@@ -48,10 +48,10 @@ export const POST = gerer(async (req) => {
   if (!dest || dest.suspendu || dest.supprimeLe || dest.role === 'ADMIN' || dest.role === u.role) {
     throw new ApiError(404, 'Destinataire introuvable')
   }
-  // Documents légaux : un transporteur non conforme n'ouvre pas de conversation et reste invisible des commissionnaires
-  if (u.role === 'TRANSPORTEUR') await exigerTransporteurConforme(u.id)
-  else if (!(await transporteurEstConforme(dest.id))) {
-    // Une conversation déjà ouverte reste accessible ; on n'en ouvre pas de nouvelle avec un transporteur non conforme
+  // Documents légaux : un compte non conforme n'ouvre pas de conversation et reste invisible de l'autre partie
+  await exigerConformite(u.id)
+  if (!(await utilisateurEstConforme(dest.id))) {
+    // Une conversation déjà ouverte reste accessible ; on n'en ouvre pas de nouvelle avec un compte non conforme
     const existante = await db.conversation.findUnique({ where: { cle: paireCle(u.id, dest.id) }, select: { id: true } })
     if (!existante) throw new ApiError(404, 'Destinataire introuvable')
   }

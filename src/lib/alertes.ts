@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { db } from './db'
 import { aAccesPayant } from './acces'
-import { clauseConforme } from './documents'
+import { clauseConforme, utilisateurEstConforme } from './documents'
 import { emailAlerteAnnonce, emailAlerteBesoin, envoyerEmail, urlApplication } from './email'
 import { recupererAnnonceDiffusion } from './geo'
 import { log, messageErreur } from './logger'
@@ -44,7 +44,7 @@ export async function declencherAlertesAnnonce(annonceId: string): Promise<void>
     const resume = `${a.raisonSociale} est disponible au départ de ${a.villeDepart}${arrivee ? ` vers ${arrivee}` : ' (toutes directions)'} à partir du ${formatJour(a.dateDisponibilite)}.`
 
     for (const al of alertes) {
-      if (!(await aAccesPayant(al.userId))) continue
+      if (!(await aAccesPayant(al.userId)) || !(await utilisateurEstConforme(al.userId))) continue
       await envoyerEmail({ ...emailAlerteAnnonce(al.nom, resume, urlApplication('/commissionnaire/recherche')), to: al.email })
       await db.alerte.update({ where: { id: al.id }, data: { derniereNotifLe: new Date() } })
     }
@@ -67,7 +67,7 @@ export async function declencherAlertesBesoin(besoinId: string): Promise<void> {
       FROM "TransporteurProfil" tp
       JOIN "User" u ON u.id = tp."userId"
       WHERE u."alertesEmail" AND NOT u.suspendu AND u."supprimeLe" IS NULL
-        ${clauseConforme('tp')}
+        ${clauseConforme('u')}
         AND 6371 * acos(LEAST(1.0,
               cos(radians(${b.latDepart})) * cos(radians(tp.latitude))
               * cos(radians(tp.longitude) - radians(${b.lngDepart}))

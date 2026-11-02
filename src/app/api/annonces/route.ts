@@ -4,7 +4,7 @@ import { annonceSchema } from '@/lib/validations/annonce'
 import { rechercherAnnoncesParRayon, recupererAnnonceDiffusion } from '@/lib/geo'
 import { getIO } from '@/lib/socket-server'
 import { declencherAlertesAnnonce } from '@/lib/alertes'
-import { ApiError, exigerAccesCommissionnaire, exigerEmailVerifie, exigerTransporteurConforme, exigerUtilisateur, gerer, json, limiter, lireJson, lireQuery } from '@/lib/api'
+import { ApiError, exigerAccesCommissionnaire, exigerEmailVerifie, exigerConformite, exigerUtilisateur, gerer, json, limiter, lireJson, lireQuery } from '@/lib/api'
 
 const MAX_ANNONCES_ACTIVES = 30
 
@@ -46,7 +46,7 @@ export const GET = gerer(async (req) => {
 export const POST = gerer(async (req) => {
   const u = await exigerUtilisateur('TRANSPORTEUR')
   exigerEmailVerifie(u)
-  await exigerTransporteurConforme(u.id)
+  await exigerConformite(u.id)
   limiter(req, 'annonces-creation', 20, 60 * 60_000, u.id)
 
   const profil = await db.transporteurProfil.findUnique({ where: { userId: u.id }, select: { id: true } })

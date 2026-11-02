@@ -3,7 +3,7 @@ import type { Server as HttpServer } from 'http'
 import { getToken } from 'next-auth/jwt'
 import { db } from './db'
 import { aAccesPayant } from './acces'
-import { transporteurEstConforme } from './documents'
+import { utilisateurEstConforme } from './documents'
 import { emailActif } from './email'
 import { ipClient } from './ip'
 import { log, messageErreur } from './logger'
@@ -137,6 +137,10 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
           socket.emit('error', { message: 'Abonnement requis pour envoyer des messages.' })
           return
         }
+        if (!(await utilisateurEstConforme(userId))) {
+          socket.emit('error', { message: 'Vos documents légaux doivent être validés pour envoyer des messages.' })
+          return
+        }
 
         const message = await db.message.create({
           data: { conversationId: d.conversationId, expediteurId: userId, contenu: contenu.data },
@@ -163,7 +167,7 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
       const d = disponibiliteSchema.safeParse({ disponible: valeur })
       if (!d.success) return
       try {
-        if (d.data.disponible && !(await transporteurEstConforme(userId))) {
+        if (d.data.disponible && !(await utilisateurEstConforme(userId))) {
           socket.emit('error', { message: 'Vos documents légaux doivent être validés avant de vous déclarer disponible.' })
           return
         }
@@ -177,11 +181,11 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
     // ── Flux en direct (réservés aux profils concernés) ─────────────────────────
     // La carte et le tableau d'annonces montrent des transporteurs : commissionnaires avec accès.
     socket.on('join-carte', async () => {
-      if (role === 'COMMISSIONNAIRE' && (await aAccesPayant(userId))) socket.join('carte')
+      if (role === 'COMMISSIONNAIRE' && (await aAccesPayant(userId)) && (await utilisateurEstConforme(userId))) socket.join('carte')
     })
 
     socket.on('join-annonces', async () => {
-      if (role === 'COMMISSIONNAIRE' && (await aAccesPayant(userId))) socket.join('annonces')
+      if (role === 'COMMISSIONNAIRE' && (await aAccesPayant(userId)) && (await utilisateurEstConforme(userId))) socket.join('annonces')
     })
 
     // Les besoins de transport sont destinés aux transporteurs

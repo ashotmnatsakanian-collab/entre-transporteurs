@@ -2,12 +2,18 @@ import { db } from '@/lib/db'
 import { exigerRoleOuRediriger } from '@/lib/garde'
 import Link from 'next/link'
 import { facturationActive } from '@/lib/facturation'
+import { exigerDocuments } from '@/lib/documents'
+import { OBLIGATOIRES_PAR_ROLE, calculerConformite } from '@/lib/documents-regles'
 
 export default async function DashboardCommissionnairePage() {
   const u = await exigerRoleOuRediriger('COMMISSIONNAIRE')
 
   const abo = await db.abonnement.findUnique({ where: { userId: u.id } })
   const profil = await db.commissionnaireProfil.findUnique({ where: { userId: u.id } })
+
+  const documents = await db.document.findMany({ where: { userId: u.id }, select: { type: true, statut: true, dateExpiration: true } })
+  const conforme = calculerConformite(documents, 'COMMISSIONNAIRE') !== null
+  const nbValides = documents.filter((d) => d.statut === 'VALIDE' && d.dateExpiration > new Date() && OBLIGATOIRES_PAR_ROLE.COMMISSIONNAIRE.includes(d.type)).length
 
   const nbConversations = await db.conversation.count({
     where: { participants: { some: { userId: u.id } } },
@@ -27,6 +33,18 @@ export default async function DashboardCommissionnairePage() {
         <h1 className="text-2xl font-bold text-slate-800">Tableau de bord</h1>
         <p className="text-slate-500">{profil?.raisonSociale}</p>
       </div>
+
+      {!conforme && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900" role="status">
+          <p className="font-semibold">Documents légaux : {nbValides}/{OBLIGATOIRES_PAR_ROLE.COMMISSIONNAIRE.length} validés</p>
+          <p className="mt-1">
+            {exigerDocuments()
+              ? "Tant qu'ils ne sont pas validés, vous n'avez accès ni à la recherche, ni à la carte, ni à la publication de besoins."
+              : 'Ils ne sont pas encore obligatoires, mais ils le deviendront : préparez-les dès maintenant.'}
+          </p>
+          <Link href="/commissionnaire/documents" className="inline-flex items-center min-h-[44px] mt-1 font-semibold underline">Déposer mes documents</Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <StatCard label="Conversations" value={nbConversations} icon="💬" />

@@ -19,12 +19,14 @@ export const GET = gerer(async (req) => {
     select: {
       id: true, email: true, nom: true, telephone: true, role: true, verifie: true, createdAt: true,
       emailVerifieLe: true, cguAccepteesLe: true, cguVersion: true, alertesEmail: true,
-      // Documents : métadonnées uniquement (les fichiers se retrouvent dans « Mes documents »)
-      transporteurProfil: { include: { vehicules: true, annonces: true, avis: true, documents: { select: { type: true, statut: true, nomFichier: true, mime: true, taille: true, dateEmission: true, dateExpiration: true, motifRefus: true, verifieLe: true, createdAt: true } } } },
+      transporteurProfil: { include: { vehicules: true, annonces: true, avis: true } },
       commissionnaireProfil: { include: { besoins: true } },
       abonnement: { select: { statut: true, dateFinEssai: true, dateFinPeriode: true, createdAt: true } },
       avisDonnes: true,
       alertes: true,
+      // Documents : métadonnées uniquement (les fichiers se retrouvent dans « Mes documents »)
+      documents: { select: { type: true, statut: true, nomFichier: true, mime: true, taille: true, dateEmission: true, dateExpiration: true, motifRefus: true, verifieLe: true, createdAt: true } },
+      documentsConformesJusqua: true, partageDocuments: true,
       signalementsEmis: { select: { cibleId: true, motif: true, details: true, createdAt: true } },
     },
   })
@@ -67,6 +69,7 @@ export const DELETE = gerer(async (req) => {
     db.commissionnaireProfil.deleteMany({ where: { userId: u.id } }), // besoins : en cascade
     db.avis.deleteMany({ where: { auteurId: u.id } }),
     db.alerte.deleteMany({ where: { userId: u.id } }),
+    db.document.deleteMany({ where: { userId: u.id } }), // fichiers chiffrés inclus (cascade)
     db.tokenEmail.deleteMany({ where: { userId: u.id } }),
     db.abonnement.deleteMany({ where: { userId: u.id } }),
     db.user.update({
@@ -80,6 +83,8 @@ export const DELETE = gerer(async (req) => {
         alertesEmail: false,
         supprimeLe: new Date(),
         motDePasseChangeLe: new Date(),
+        documentsConformesJusqua: null,
+        partageDocuments: false,
       },
     }),
   ])

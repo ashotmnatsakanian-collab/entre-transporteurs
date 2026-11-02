@@ -6,15 +6,11 @@ import { GestionDocuments } from '@/components/documents/GestionDocuments'
 
 export const metadata = { title: 'Mes documents — Entre Transporteurs' }
 
-export default async function DocumentsPage() {
+export default async function DocumentsTransporteurPage() {
   const u = await exigerRoleOuRediriger('TRANSPORTEUR')
-  const profil = await db.transporteurProfil.findUnique({
-    where: { userId: u.id },
-    select: {
-      partageDocuments: true,
-      documentsConformesJusqua: true,
-      documents: { select: { id: true, type: true, statut: true, nomFichier: true, dateExpiration: true, motifRefus: true } },
-    },
+  const moi = await db.user.findUniqueOrThrow({
+    where: { id: u.id },
+    select: { partageDocuments: true, documents: { select: { id: true, type: true, statut: true, nomFichier: true, dateExpiration: true, motifRefus: true } } },
   })
 
   return (
@@ -25,10 +21,11 @@ export default async function DocumentsPage() {
         apparaissez dans les recherches.
       </p>
       <GestionDocuments
-        documents={profil?.documents ?? []}
-        partage={profil?.partageDocuments ?? false}
+        role="TRANSPORTEUR"
+        documents={moi.documents}
+        partage={moi.partageDocuments}
         exiges={exigerDocuments()}
-        conforme={calculerConformite(profil?.documents ?? []) !== null}
+        conforme={calculerConformite(moi.documents, 'TRANSPORTEUR') !== null}
       />
     </div>
   )

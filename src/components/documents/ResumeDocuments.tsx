@@ -1,7 +1,9 @@
 import type { StatutDocument, TypeDocument } from '@prisma/client'
-import { DOCUMENTS, TYPES_DOCUMENTS, statutEffectif } from '@/lib/documents-regles'
+import { OBLIGATOIRES_PAR_ROLE, TYPES_PAR_ROLE, definition, statutEffectif, type RoleAvecDocuments } from '@/lib/documents-regles'
 
 interface Props {
+  /** Rôle du propriétaire des documents */
+  role: RoleAvecDocuments
   documents: Array<{ id: string; type: TypeDocument; statut: StatutDocument; dateExpiration: Date }>
   conforme: boolean
   /** Le transporteur partage ses documents et une conversation existe : téléchargement possible */
@@ -9,7 +11,7 @@ interface Props {
 }
 
 // Vue commissionnaire : seuls les documents validés et en cours de validité sont présentés comme tels.
-export function ResumeDocuments({ documents, conforme, peutTelecharger }: Props) {
+export function ResumeDocuments({ role, documents, conforme, peutTelecharger }: Props) {
   const maintenant = new Date()
   return (
     <section className="bg-white border border-slate-200 rounded-xl p-5" aria-labelledby="titre-documents">
@@ -24,13 +26,13 @@ export function ResumeDocuments({ documents, conforme, peutTelecharger }: Props)
         de l'attestation de vigilance auprès de l'URSSAF.
       </p>
       <ul className="divide-y divide-slate-100 text-sm">
-        {TYPES_DOCUMENTS.map((type) => {
+        {TYPES_PAR_ROLE[role].map((type) => {
           const d = documents.find((x) => x.type === type)
           const statut = statutEffectif(d, maintenant)
           const ok = statut === 'VALIDE' && d
           return (
             <li key={type} className="py-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-slate-800">{DOCUMENTS[type].court}</span>
+              <span className="text-slate-800">{definition(type, role).court}{!OBLIGATOIRES_PAR_ROLE[role].includes(type) && <span className="text-xs text-slate-600"> (recommandé)</span>}</span>
               <span className="flex items-center gap-3">
                 {ok ? (
                   <span className="text-green-800">Valide jusqu'au {d.dateExpiration.toLocaleDateString('fr-FR')}</span>
@@ -47,7 +49,7 @@ export function ResumeDocuments({ documents, conforme, peutTelecharger }: Props)
       </ul>
       {!peutTelecharger && (
         <p className="text-xs text-slate-600 mt-3">
-          Les fichiers sont téléchargeables une fois une conversation ouverte, si le transporteur a autorisé le partage de ses documents.
+          Les fichiers sont téléchargeables une fois une conversation ouverte, si leur propriétaire a autorisé le partage de ses documents.
         </p>
       )}
     </section>

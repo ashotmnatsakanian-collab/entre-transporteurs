@@ -11,7 +11,7 @@ export default async function CartePage() {
 
   const [transporteurs, agregatsAvis] = await Promise.all([
     db.transporteurProfil.findMany({
-      where: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() },
+      where: { user: { suspendu: false, supprimeLe: null, ...filtreConforme() } },
       select: {
         id: true, userId: true, raisonSociale: true, description: true, latitude: true, longitude: true,
         disponible: true, zonesCirculation: true,

@@ -66,7 +66,7 @@ export async function rechercherParRayon(
     ) av ON av."transporteurId" = tp.id
     WHERE
       NOT u.suspendu AND u."supprimeLe" IS NULL
-      ${clauseConforme('tp')}
+      ${clauseConforme('u')}
       AND 6371 * acos(
         LEAST(1.0,
           cos(radians(${lat})) * cos(radians(tp.latitude))
@@ -203,7 +203,7 @@ export async function rechercherAnnoncesParRayon(params: {
     WHERE
       a.active = true
       AND NOT u.suspendu AND u."supprimeLe" IS NULL
-      ${clauseConforme('tp')}
+      ${clauseConforme('u')}
       ${clauseDate}
       ${clauseArrivee}
       AND 6371 * acos(
@@ -261,6 +261,7 @@ export async function rechercherBesoinsParRayon(lat: number, lng: number, rayonK
     JOIN "User" u ON u.id = cp."userId"
     WHERE b.active
       AND NOT u.suspendu AND u."supprimeLe" IS NULL
+      ${clauseConforme('u')}
       AND b."dateEnlevement" >= NOW() - INTERVAL '1 day'
       AND 6371 * acos(LEAST(1.0,
         cos(radians(${lat})) * cos(radians(b."latDepart"))

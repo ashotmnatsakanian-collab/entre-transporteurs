@@ -1,6 +1,6 @@
 import { db } from './db'
 import { log, messageErreur } from './logger'
-import { DOCUMENTS } from './documents-regles'
+import { definition, roleAvecDocuments } from './documents-regles'
 import { emailDocumentsExpiration, envoyerEmail, urlApplication } from './email'
 
 // Durées annoncées dans la politique de confidentialité : ne pas les changer sans mettre ce texte à jour.
@@ -40,38 +40,37 @@ function ilYAMois(mois: number, maintenant: Date): Date {
  * retire la conformité des profils dont un document est arrivé à échéance.
  */
 export async function purgerDocuments(maintenant: Date = new Date()): Promise<{ refuses: number; expires: number; profils: number }> {
-  const refuses = await db.documentTransporteur.deleteMany({
+  const refuses = await db.document.deleteMany({
     where: { statut: 'REFUSE', verifieLe: { lt: new Date(maintenant.getTime() - CONSERVATION_DOCUMENT_REFUSE_JOURS * MS_PAR_JOUR) } },
   })
-  const expires = await db.documentTransporteur.deleteMany({ where: { dateExpiration: { lt: ilYAMois(CONSERVATION_DOCUMENT_EXPIRE_MOIS, maintenant) } } })
-  const profils = await db.transporteurProfil.updateMany({
+  const expires = await db.document.deleteMany({ where: { dateExpiration: { lt: ilYAMois(CONSERVATION_DOCUMENT_EXPIRE_MOIS, maintenant) } } })
+  const profils = await db.user.updateMany({
     where: { documentsConformesJusqua: { lte: maintenant } },
     data: { documentsConformesJusqua: null },
   })
   return { refuses: refuses.count, expires: expires.count, profils: profils.count }
 }
 
-/** Prévient une fois chaque transporteur dont des documents validés expirent dans les 30 jours. */
+/** Prévient une fois chaque utilisateur dont des documents validés expirent dans les 30 jours. */
 export async function rappelerExpirationsDocuments(maintenant: Date = new Date()): Promise<number> {
   const limite = new Date(maintenant.getTime() + PREAVIS_EXPIRATION_DOCUMENT_JOURS * MS_PAR_JOUR)
-  const docs = await db.documentTransporteur.findMany({
-    where: {
-      statut: 'VALIDE', rappelEnvoyeLe: null, dateExpiration: { gt: maintenant, lte: limite },
-      transporteur: { user: { suspendu: false, supprimeLe: null } },
-    },
-    select: { id: true, type: true, dateExpiration: true, transporteurId: true, transporteur: { select: { user: { select: { email: true, nom: true } } } } },
+  const docs = await db.document.findMany({
+    where: { statut: 'VALIDE', rappelEnvoyeLe: null, dateExpiration: { gt: maintenant, lte: limite }, user: { suspendu: false, supprimeLe: null } },
+    select: { id: true, type: true, dateExpiration: true, userId: true, user: { select: { email: true, nom: true, role: true } } },
   })
-  const parTransporteur = new Map<string, typeof docs>()
-  for (const d of docs) parTransporteur.set(d.transporteurId, [...(parTransporteur.get(d.transporteurId) ?? []), d])
+  const parUtilisateur = new Map<string, typeof docs>()
+  for (const d of docs) parUtilisateur.set(d.userId, [...(parUtilisateur.get(d.userId) ?? []), d])
 
   let envoyes = 0
-  for (const liste of parTransporteur.values()) {
-    const user = liste[0].transporteur.user
-    const lignes = liste.map((d) => `${DOCUMENTS[d.type].libelle} — expire le ${d.dateExpiration.toLocaleDateString('fr-FR')}`)
-    const ok = await envoyerEmail({ ...emailDocumentsExpiration(user.nom, lignes, urlApplication('/transporteur/documents')), to: user.email })
+  for (const liste of parUtilisateur.values()) {
+    const user = liste[0].user
+    const role = roleAvecDocuments(user.role) ?? 'TRANSPORTEUR'
+    const lignes = liste.map((d) => `${definition(d.type, role).libelle} — expire le ${d.dateExpiration.toLocaleDateString('fr-FR')}`)
+    const page = role === 'COMMISSIONNAIRE' ? '/commissionnaire/documents' : '/transporteur/documents'
+    const ok = await envoyerEmail({ ...emailDocumentsExpiration(user.nom, lignes, urlApplication(page), role), to: user.email })
     // Marqué seulement si l'envoi a réussi : sinon nouvel essai à la prochaine passe
     if (ok) {
-      await db.documentTransporteur.updateMany({ where: { id: { in: liste.map((d) => d.id) } }, data: { rappelEnvoyeLe: maintenant } })
+      await db.document.updateMany({ where: { id: { in: liste.map((d) => d.id) } }, data: { rappelEnvoyeLe: maintenant } })
       envoyes++
     }
   }

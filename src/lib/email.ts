@@ -125,17 +125,18 @@ export function emailDocumentDecision(nom: string, libelle: string, valide: bool
   }
 }
 
-export function emailDocumentsExpiration(nom: string, lignes: string[], url: string): Email {
+export function emailDocumentsExpiration(nom: string, lignes: string[], url: string, role: 'TRANSPORTEUR' | 'COMMISSIONNAIRE' = 'TRANSPORTEUR'): Email {
+  const consequence = role === 'COMMISSIONNAIRE' ? "vous perdrez l'accès à la recherche et à la carte" : "vous cesserez d'être visible des commissionnaires"
   const liste = lignes.map((l) => `<li>${echapperHtml(l)}</li>`).join('')
   return {
     to: '',
     sujet: 'Vos documents arrivent à expiration',
     html: gabarit(
       'Documents à renouveler',
-      `<p>Bonjour ${echapperHtml(nom)}, ces documents expirent bientôt. Sans renouvellement, vous cesserez d'être visible des commissionnaires.</p><ul>${liste}</ul>`,
+      `<p>Bonjour ${echapperHtml(nom)}, ces documents expirent bientôt. Sans renouvellement, ${consequence}.</p><ul>${liste}</ul>`,
       'Renouveler mes documents',
       url
     ),
-    texte: `Bonjour ${nom},\n\nCes documents expirent bientôt (sans renouvellement, vous cesserez d'être visible des commissionnaires) :\n- ${lignes.join('\n- ')}\n\n${url}\n`,
+    texte: `Bonjour ${nom},\n\nCes documents expirent bientôt (sans renouvellement, ${consequence}) :\n- ${lignes.join('\n- ')}\n\n${url}\n`,
   }
 }

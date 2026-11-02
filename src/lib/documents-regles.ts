@@ -1,5 +1,5 @@
 // Règles des documents légaux des transporteurs. Fichier SANS dépendance serveur : utilisé aussi par l'interface.
-import type { StatutDocument, TypeDocument } from '@prisma/client'
+import type { Role, StatutDocument, TypeDocument } from '@prisma/client'
 
 export const TAILLE_MAX_OCTETS = 5 * 1024 * 1024
 export const FORMATS_ACCEPTES = '.pdf,.jpg,.jpeg,.png'
@@ -61,11 +61,48 @@ export const DOCUMENTS: Record<TypeDocument, DefinitionDocument> = {
     regle: { genre: 'fin' },
     aideDate: "Date d'échéance indiquée sur l'attestation",
   },
+  REGISTRE_COMMISSIONNAIRE: {
+    libelle: 'Inscription au registre des commissionnaires de transport',
+    court: 'Registre des commissionnaires',
+    description: "Attestation d'inscription au registre des commissionnaires de transport, si vous exercez cette activité (les chargeurs n'en ont pas besoin).",
+    ouLObtenir: 'DREAL (ou DRIEAT en Île-de-France) de votre région',
+    regle: { genre: 'fin' },
+    aideDate: 'Date de fin de validité indiquée sur le document',
+  },
 }
 
-/** Ordre d'affichage ; tous sont obligatoires pour être visible des commissionnaires. */
-export const TYPES_DOCUMENTS: TypeDocument[] = ['KBIS', 'LICENCE_TRANSPORT', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE']
-export const TYPES_OBLIGATOIRES: TypeDocument[] = TYPES_DOCUMENTS
+export type RoleAvecDocuments = Extract<Role, 'TRANSPORTEUR' | 'COMMISSIONNAIRE'>
+
+/** Textes propres au commissionnaire quand ils diffèrent de ceux du transporteur. */
+const SURCHARGES_COMMISSIONNAIRE: Partial<Record<TypeDocument, Partial<DefinitionDocument>>> = {
+  ASSURANCE: {
+    libelle: "Attestation d'assurance responsabilité civile professionnelle",
+    description: "Attestation en cours de validité de votre assurance responsabilité civile professionnelle (et, si vous êtes commissionnaire de transport, couvrant cette activité).",
+  },
+}
+
+export function definition(type: TypeDocument, role: RoleAvecDocuments = 'TRANSPORTEUR'): DefinitionDocument {
+  return role === 'COMMISSIONNAIRE' ? { ...DOCUMENTS[type], ...SURCHARGES_COMMISSIONNAIRE[type] } : DOCUMENTS[type]
+}
+
+/** Documents que chaque rôle peut déposer, dans l'ordre d'affichage. */
+export const TYPES_PAR_ROLE: Record<RoleAvecDocuments, TypeDocument[]> = {
+  TRANSPORTEUR: ['KBIS', 'LICENCE_TRANSPORT', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE'],
+  COMMISSIONNAIRE: ['KBIS', 'REGISTRE_COMMISSIONNAIRE', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE'],
+}
+
+/**
+ * Documents sans lesquels le compte n'est pas conforme. Le registre des commissionnaires est demandé mais non bloquant :
+ * un chargeur n'y est pas inscrit (à passer en obligatoire si la plateforme ne s'adresse qu'à des commissionnaires de transport).
+ */
+export const OBLIGATOIRES_PAR_ROLE: Record<RoleAvecDocuments, TypeDocument[]> = {
+  TRANSPORTEUR: ['KBIS', 'LICENCE_TRANSPORT', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE'],
+  COMMISSIONNAIRE: ['KBIS', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE'],
+}
+
+export function roleAvecDocuments(role: Role): RoleAvecDocuments | null {
+  return role === 'TRANSPORTEUR' || role === 'COMMISSIONNAIRE' ? role : null
+}
 
 export const LIBELLE_STATUT: Record<StatutDocument | 'EXPIRE' | 'MANQUANT', string> = {
   MANQUANT: 'À fournir',
@@ -122,12 +159,12 @@ export function statutEffectif(d: Pick<DocumentResume, 'statut' | 'dateExpiratio
 }
 
 /**
- * Conformité : tous les documents obligatoires sont présents, validés et en cours de validité.
+ * Conformité : tous les documents obligatoires du rôle sont présents, validés et en cours de validité.
  * Retourne la date à laquelle le premier d'entre eux expire (la conformité tombe alors), ou null.
  */
-export function calculerConformite(documents: DocumentResume[], maintenant: Date = new Date()): Date | null {
+export function calculerConformite(documents: DocumentResume[], role: RoleAvecDocuments = 'TRANSPORTEUR', maintenant: Date = new Date()): Date | null {
   let limite: Date | null = null
-  for (const type of TYPES_OBLIGATOIRES) {
+  for (const type of OBLIGATOIRES_PAR_ROLE[role]) {
     const d = documents.find((x) => x.type === type)
     if (!d || d.statut !== 'VALIDE' || d.dateExpiration.getTime() <= maintenant.getTime()) return null
     if (!limite || d.dateExpiration < limite) limite = d.dateExpiration

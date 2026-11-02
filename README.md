@@ -11,7 +11,7 @@ npx prisma migrate deploy         # crée les tables
 npm run db:seed                   # données de démonstration (LOCAL uniquement)
 npm run dev                       # http://localhost:3000
 npm test                          # tests unitaires
-npm run verif:securite            # ~209 contrôles rejoués contre l'application (serveur lancé)
+npm run verif:securite            # ~236 contrôles rejoués contre l'application (serveur lancé)
 ```
 
 ---
@@ -48,6 +48,7 @@ npm run verif:securite            # ~209 contrôles rejoués contre l'applicatio
 - **Carte interactive** des transporteurs disponibles, mise à jour en temps réel
 - Publication de **besoins de transport** ; alertes e-mail quand un transporteur publie un trajet correspondant
 - Fiche transporteur, avis (après échange réel), signalement
+- **Documents légaux** (Kbis, vigilance URSSAF, régularité fiscale, assurance) à fournir et faire valider pour accéder à la recherche, à la carte et aux besoins
 
 ### Pour tous
 - Messagerie temps réel entre transporteur et commissionnaire (badge de non-lus)

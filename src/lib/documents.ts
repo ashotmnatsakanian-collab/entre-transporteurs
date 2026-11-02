@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } f
 import { Prisma } from '@prisma/client'
 import { db } from './db'
 import { estProduction } from './env'
-import { calculerConformite } from './documents-regles'
+import { calculerConformite, roleAvecDocuments } from './documents-regles'
 
 // ── Obligation de fournir les documents ────────────────────────────────────────
 
@@ -18,25 +18,25 @@ export function exigerDocuments(): boolean {
   return estProduction
 }
 
-/** Fragment SQL : ne garde que les transporteurs conformes (alias de la table passé en paramètre). */
-export function clauseConforme(alias = 'tp'): Prisma.Sql {
+/** Fragment SQL : ne garde que les utilisateurs conformes (alias de la table "User" passé en paramètre). */
+export function clauseConforme(alias = 'u'): Prisma.Sql {
   if (!exigerDocuments()) return Prisma.empty
   return Prisma.sql`AND ${Prisma.raw(`${alias}."documentsConformesJusqua"`)} > NOW()`
 }
 
-/** Filtre Prisma équivalent. */
+/** Filtre Prisma équivalent, à placer dans un `where` portant sur User. */
 export function filtreConforme(): { documentsConformesJusqua?: { gt: Date } } {
   return exigerDocuments() ? { documentsConformesJusqua: { gt: new Date() } } : {}
 }
 
-/** Recalcule et enregistre la conformité d'un transporteur après toute modification de ses documents. */
-export async function recalculerConformite(transporteurId: string): Promise<Date | null> {
-  const docs = await db.documentTransporteur.findMany({
-    where: { transporteurId },
-    select: { type: true, statut: true, dateExpiration: true },
-  })
-  const limite = calculerConformite(docs)
-  await db.transporteurProfil.update({ where: { id: transporteurId }, data: { documentsConformesJusqua: limite } })
+/** Recalcule et enregistre la conformité d'un utilisateur après toute modification de ses documents. */
+export async function recalculerConformite(userId: string): Promise<Date | null> {
+  const user = await db.user.findUnique({ where: { id: userId }, select: { role: true } })
+  const role = user && roleAvecDocuments(user.role)
+  if (!role) return null
+  const docs = await db.document.findMany({ where: { userId }, select: { type: true, statut: true, dateExpiration: true } })
+  const limite = calculerConformite(docs, role)
+  await db.user.update({ where: { id: userId }, data: { documentsConformesJusqua: limite } })
   return limite
 }
 
@@ -72,10 +72,10 @@ export function dechiffrer(donnees: Buffer, documentId: string): Buffer {
 
 export const empreinte = (octets: Buffer) => createHash('sha256').update(octets).digest('hex')
 
-// ── Garde des actions réservées aux transporteurs conformes ────────────────────
+// ── Conformité d'un compte ─────────────────────────────────────────────────────
 
-export async function transporteurEstConforme(userId: string): Promise<boolean> {
+export async function utilisateurEstConforme(userId: string): Promise<boolean> {
   if (!exigerDocuments()) return true
-  const p = await db.transporteurProfil.findUnique({ where: { userId }, select: { documentsConformesJusqua: true } })
-  return !!p?.documentsConformesJusqua && p.documentsConformesJusqua.getTime() > Date.now()
+  const u = await db.user.findUnique({ where: { id: userId }, select: { documentsConformesJusqua: true } })
+  return !!u?.documentsConformesJusqua && u.documentsConformesJusqua.getTime() > Date.now()
 }

@@ -72,6 +72,7 @@ export async function middleware(req: NextRequest) {
   // Le nonce et la CSP sont transmis à Next (qui équipe ses propres scripts du nonce)
   const entetesRequete = new Headers(req.headers)
   entetesRequete.set('x-nonce', nonce)
+  entetesRequete.set('x-chemin', chemin)
   entetesRequete.set('Content-Security-Policy', csp)
   const res = NextResponse.next({ request: { headers: entetesRequete } })
   ajouterEntetesSecurite(res, csp)

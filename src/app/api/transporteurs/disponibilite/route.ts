@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { disponibiliteSchema } from '@/lib/validations/divers'
 import { getIO } from '@/lib/socket-server'
-import { exigerTransporteurConforme, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
+import { exigerConformite, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
 // PATCH /api/transporteurs/disponibilite — "disponible maintenant"
 export const PATCH = gerer(async (req) => {
@@ -9,7 +9,7 @@ export const PATCH = gerer(async (req) => {
   limiter(req, 'disponibilite', 60, 60 * 60_000, u.id)
   const { disponible } = await lireJson(req, disponibiliteSchema)
   // Se déclarer disponible exige des documents validés ; se déclarer indisponible reste toujours possible
-  if (disponible) await exigerTransporteurConforme(u.id)
+  if (disponible) await exigerConformite(u.id)
 
   const profil = await db.transporteurProfil.update({ where: { userId: u.id }, data: { disponible, derniereMAJ: new Date() } })
   getIO()?.to('carte').emit('disponibilite-change', { userId: u.id, disponible })

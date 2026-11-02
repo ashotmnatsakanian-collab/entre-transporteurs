@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  DOCUMENTS, TYPES_OBLIGATOIRES, calculerConformite, calculerExpiration, detecterMime, nettoyerNomFichier, pdfSuspect, statutEffectif,
+  DOCUMENTS, OBLIGATOIRES_PAR_ROLE, TYPES_PAR_ROLE, calculerConformite, definition, calculerExpiration, detecterMime, nettoyerNomFichier, pdfSuspect, statutEffectif,
 } from '../src/lib/documents-regles'
 import { chiffrer, dechiffrer, empreinte, exigerDocuments } from '../src/lib/documents'
 
@@ -67,13 +67,13 @@ describe("date d'expiration des documents", () => {
   })
 
   it('chaque type a une règle', () => {
-    for (const t of TYPES_OBLIGATOIRES) expect(DOCUMENTS[t].regle).toBeDefined()
+    for (const t of OBLIGATOIRES_PAR_ROLE.TRANSPORTEUR) expect(DOCUMENTS[t].regle).toBeDefined()
   })
 })
 
 describe('conformité du dossier', () => {
   const complet = (statut: 'VALIDE' | 'EN_ATTENTE' | 'REFUSE' = 'VALIDE', jours = 60) =>
-    TYPES_OBLIGATOIRES.map((type) => ({ type, statut, dateExpiration: dans(jours) }))
+    OBLIGATOIRES_PAR_ROLE.TRANSPORTEUR.map((type) => ({ type, statut, dateExpiration: dans(jours) }))
 
   it('est conforme quand les cinq documents sont validés et en cours de validité', () => {
     expect(calculerConformite(complet())).not.toBeNull()
@@ -97,6 +97,45 @@ describe('conformité du dossier', () => {
     expect(statutEffectif({ statut: 'VALIDE', dateExpiration: dans(-1) })).toBe('EXPIRE')
     expect(statutEffectif({ statut: 'VALIDE', dateExpiration: dans(1) })).toBe('VALIDE')
     expect(statutEffectif(undefined)).toBe('MANQUANT')
+  })
+})
+
+describe('documents des commissionnaires', () => {
+  const dossier = (types: readonly string[], statut: 'VALIDE' | 'EN_ATTENTE' = 'VALIDE') =>
+    types.map((type) => ({ type: type as never, statut, dateExpiration: dans(60) }))
+
+  it("chaque rôle a ses documents, la licence de transport n'étant demandée qu'aux transporteurs", () => {
+    expect(TYPES_PAR_ROLE.TRANSPORTEUR).toContain('LICENCE_TRANSPORT')
+    expect(TYPES_PAR_ROLE.COMMISSIONNAIRE).not.toContain('LICENCE_TRANSPORT')
+    expect(TYPES_PAR_ROLE.TRANSPORTEUR).not.toContain('REGISTRE_COMMISSIONNAIRE')
+    expect(TYPES_PAR_ROLE.COMMISSIONNAIRE).toContain('REGISTRE_COMMISSIONNAIRE')
+  })
+
+  it("le registre des commissionnaires est demandé mais ne bloque pas la conformité", () => {
+    expect(OBLIGATOIRES_PAR_ROLE.COMMISSIONNAIRE).not.toContain('REGISTRE_COMMISSIONNAIRE')
+    expect(calculerConformite(dossier(OBLIGATOIRES_PAR_ROLE.COMMISSIONNAIRE), 'COMMISSIONNAIRE')).not.toBeNull()
+  })
+
+  it("sans licence de transport, un dossier est conforme pour un commissionnaire mais pas pour un transporteur", () => {
+    const sansLicence = dossier(['KBIS', 'VIGILANCE_URSSAF', 'REGULARITE_FISCALE', 'ASSURANCE'])
+    expect(calculerConformite(sansLicence, 'COMMISSIONNAIRE')).not.toBeNull()
+    expect(calculerConformite(sansLicence, 'TRANSPORTEUR')).toBeNull()
+  })
+
+  it('un commissionnaire incomplet ou en attente est non conforme', () => {
+    expect(calculerConformite(dossier(['KBIS', 'ASSURANCE']), 'COMMISSIONNAIRE')).toBeNull()
+    expect(calculerConformite(dossier(OBLIGATOIRES_PAR_ROLE.COMMISSIONNAIRE, 'EN_ATTENTE'), 'COMMISSIONNAIRE')).toBeNull()
+  })
+
+  it("le texte de l'assurance est adapté au commissionnaire", () => {
+    expect(definition('ASSURANCE', 'COMMISSIONNAIRE').libelle).toContain('responsabilité civile professionnelle')
+    expect(definition('ASSURANCE', 'TRANSPORTEUR').libelle).toBe(DOCUMENTS.ASSURANCE.libelle)
+    expect(definition('KBIS', 'COMMISSIONNAIRE').libelle).toBe(DOCUMENTS.KBIS.libelle)
+  })
+
+  it("le registre des commissionnaires porte sa propre date de fin", () => {
+    expect(calculerExpiration('REGISTRE_COMMISSIONNAIRE', { dateFin: dans(300) }).ok).toBe(true)
+    expect(calculerExpiration('REGISTRE_COMMISSIONNAIRE', { dateFin: dans(-3) }).ok).toBe(false)
   })
 })
 

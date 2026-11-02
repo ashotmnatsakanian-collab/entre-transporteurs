@@ -75,19 +75,21 @@ function RegisterForm() {
         ))}
       </div>
 
-      {role === 'TRANSPORTEUR' && (
-        <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
-          <p className="font-semibold mb-1">Pour être visible des commissionnaires, préparez :</p>
-          <ul className="list-disc pl-5 space-y-0.5">
-            <li>votre extrait Kbis (ou D1 / avis de situation)</li>
-            <li>votre licence de transport</li>
-            <li>votre attestation de vigilance URSSAF</li>
-            <li>votre attestation de régularité fiscale</li>
-            <li>votre attestation d'assurance</li>
-          </ul>
-          <p className="mt-2 text-slate-700">Vous les déposerez après l'inscription ; l'équipe les vérifie.</p>
-        </div>
-      )}
+      <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+        <p className="font-semibold mb-1">
+          {role === 'TRANSPORTEUR' ? 'Pour être visible des commissionnaires, préparez :' : 'Pour accéder à la recherche et à la carte, préparez :'}
+        </p>
+        <ul className="list-disc pl-5 space-y-0.5">
+          <li>votre extrait Kbis (ou D1 / avis de situation)</li>
+          {role === 'TRANSPORTEUR'
+            ? <li>votre licence de transport</li>
+            : <li>votre inscription au registre des commissionnaires (recommandé)</li>}
+          <li>votre attestation de vigilance URSSAF</li>
+          <li>votre attestation de régularité fiscale</li>
+          <li>votre attestation d'assurance</li>
+        </ul>
+        <p className="mt-2 text-slate-700">Vous les déposerez après l'inscription ; l'équipe les vérifie.</p>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
