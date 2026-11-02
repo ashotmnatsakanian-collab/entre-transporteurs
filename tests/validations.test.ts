@@ -46,18 +46,19 @@ describe('SIRET dans les profils', () => {
     expect(siretSchema.parse('356 000 000 00048')).toBe('35600000000048')
     expect(siretSchema.safeParse('12345678900001').success).toBe(false)
   })
-  it('profil transporteur : coordonnées bornées', () => {
-    const base = { siret: '35600000000048', raisonSociale: 'Test SARL', latitude: 48, longitude: 2 }
-    expect(profilTransporteurSchema.safeParse(base).success).toBe(true)
-    expect(profilTransporteurSchema.safeParse({ ...base, latitude: 91 }).success).toBe(false)
+  it("profil transporteur : les coordonnées envoyées par le client sont ignorées (la position passe par la commune)", () => {
+    const base = { siret: '35600000000048', raisonSociale: 'Test SARL', latitude: 48.123456, longitude: 2.654321 }
+    const r = profilTransporteurSchema.parse(base)
+    expect(r).not.toHaveProperty('latitude')
+    expect(r).not.toHaveProperty('longitude')
   })
 })
 
 describe('annonce', () => {
-  const base = { villeDepart: 'Lyon', latDepart: 45.7, lngDepart: 4.8, dateDisponibilite: new Date(Date.now() + jour).toISOString() }
+  const base = { inseeDepart: '69123', dateDisponibilite: new Date(Date.now() + jour).toISOString() }
   it('accepte une annonce valide et normalise les champs vides', () => {
-    const r = annonceSchema.parse({ ...base, villeArrivee: '', commentaire: '  ' })
-    expect(r.villeArrivee).toBeNull()
+    const r = annonceSchema.parse({ ...base, inseeArrivee: '', commentaire: '  ' })
+    expect(r.inseeArrivee).toBeNull()
     expect(r.commentaire).toBeNull()
   })
   it('refuse une date passée, une fin avant le début, et un horizon trop lointain', () => {
@@ -67,7 +68,15 @@ describe('annonce', () => {
   })
   it('borne la longueur des textes', () => {
     expect(annonceSchema.safeParse({ ...base, commentaire: 'x'.repeat(501) }).success).toBe(false)
-    expect(annonceSchema.safeParse({ ...base, villeDepart: 'x'.repeat(101) }).success).toBe(false)
+    expect(annonceSchema.safeParse({ ...base, inseeDepart: 'x'.repeat(101) }).success).toBe(false)
+  })
+  it('désigne les communes par leur code INSEE et ignore toute coordonnée envoyée', () => {
+    expect(annonceSchema.safeParse({ ...base, inseeArrivee: '13055' }).success).toBe(true)
+    expect(annonceSchema.safeParse({ ...base, inseeDepart: '2A004' }).success).toBe(true)
+    expect(annonceSchema.safeParse({ ...base, inseeDepart: 'Lyon' }).success).toBe(false)
+    const r = annonceSchema.parse({ ...base, latDepart: 45.123456, lngDepart: 4.123456, villeDepart: 'Lyon' })
+    expect(r).not.toHaveProperty('latDepart')
+    expect(r).not.toHaveProperty('villeDepart')
   })
 })
 

@@ -8,7 +8,7 @@ import { emailActif } from './email'
 import { ipClient } from './ip'
 import { log, messageErreur } from './logger'
 import { consommer } from './rate-limit'
-import { contenuMessageSchema, disponibiliteSchema } from './validations/divers'
+import { contenuMessageSchema } from './validations/divers'
 
 declare global {
   // eslint-disable-next-line no-var
@@ -158,23 +158,6 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
       } catch (err) {
         log.error('send-message échoué', { erreur: messageErreur(err) })
         socket.emit('error', { message: "Erreur lors de l'envoi du message" })
-      }
-    })
-
-    // ── Disponibilité temps réel ────────────────────────────────────────────────
-    socket.on('update-disponibilite', async (valeur: unknown) => {
-      if (role !== 'TRANSPORTEUR' || !autorise('dispo', 30, 60_000)) return
-      const d = disponibiliteSchema.safeParse({ disponible: valeur })
-      if (!d.success) return
-      try {
-        if (d.data.disponible && !(await utilisateurEstConforme(userId))) {
-          socket.emit('error', { message: 'Vos documents légaux doivent être validés avant de vous déclarer disponible.' })
-          return
-        }
-        await db.transporteurProfil.update({ where: { userId }, data: { disponible: d.data.disponible, derniereMAJ: new Date() } })
-        io.to('carte').emit('disponibilite-change', { userId, disponible: d.data.disponible })
-      } catch {
-        socket.emit('error', { message: 'Erreur mise à jour disponibilité' })
       }
     })
 

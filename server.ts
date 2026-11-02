@@ -1,11 +1,16 @@
 import { createServer } from 'http'
+import { setDefaultResultOrder } from 'dns'
 import next from 'next'
 import { loadEnvConfig } from '@next/env'
 import { verifierEnvironnement } from './src/lib/env'
 import { initSocketServer } from './src/lib/socket-server'
 import { db } from './src/lib/db'
 import { planifierPurge } from './src/lib/purge'
+import { planifierDisponibilites } from './src/lib/disponibilites-jobs'
 import { log, messageErreur } from './src/lib/logger'
+
+// Les API publiques (communes, entreprises) sont joignables en IPv4 de façon fiable ; leur IPv6 peut s'enliser
+setDefaultResultOrder('ipv4first')
 
 const dev = process.env.NODE_ENV !== 'production'
 // Charge .env avant toute vérification (sinon la validation ne verrait que les variables du shell)
@@ -36,6 +41,7 @@ app.prepare().then(() => {
 
   initSocketServer(httpServer)
   planifierPurge()
+  planifierDisponibilites()
 
   httpServer.listen(port, hostname, () => {
     console.log(`▶  Ready on http://${hostname}:${port}`)

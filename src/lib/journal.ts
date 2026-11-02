@@ -16,6 +16,7 @@ export type TypeEvenement =
   | 'document_depose'
   | 'document_supprime'
   | 'document_telecharge'
+  | 'disponibilite_renouvelee'
   | 'signalement'
   | 'admin_action'
   | 'acces_refuse'

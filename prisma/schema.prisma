@@ -19,6 +19,7 @@ enum Role {
 enum TypeToken {
   VERIFICATION_EMAIL
   REINITIALISATION_MDP
+  RENOUVELER_DISPONIBILITE
 }
 
 enum MotifSignalement {
@@ -144,15 +145,30 @@ model TransporteurProfil {
   siretVerifieLe     DateTime?
   activiteOfficielle String?
 
-  // Point de base — requêtes géo via $queryRaw (haversine / PostGIS)
+  // Position ACTUELLE, au niveau de la commune (centre de la commune fourni par l'API officielle) :
+  // jamais de coordonnées GPS exactes. latitude/longitude = centre de la commune.
   latitude  Float
   longitude Float
+  positionVille       String?
+  positionInsee       String?
+  positionDepartement String? // code département : "57", "2A", "971"…
+  positionRegion      String? // code région INSEE
 
-  // Codes INSEE département ("75", "69") ou région ("11", "93")
-  zonesCirculation String[]
+  // Zone d'intervention : rayon autour de la position et/ou départements où le transporteur accepte d'aller
+  rayonInterventionKm Int?
+  zonesCirculation    String[] // codes départements acceptés
+  // Destination souhaitée (facultative), ex. « retour vers Lyon »
+  destinationVille       String?
+  destinationInsee       String?
+  destinationDepartement String?
 
-  disponible  Boolean  @default(false)
-  derniereMAJ DateTime @default(now())
+  // « Disponible maintenant » : expire automatiquement (durée réglable) pour éviter les annonces périmées
+  disponible          Boolean   @default(false)
+  disponibleJusqua    DateTime?
+  dureeDisponibiliteH Int       @default(24)
+  rappelDispoEnvoyeLe DateTime?
+  // Dernière mise à jour de la position ou de la disponibilité (fraîcheur affichée aux commissionnaires)
+  derniereMAJ         DateTime  @default(now())
 
   vehicules Vehicule[]
   annonces  Annonce[]
@@ -163,6 +179,9 @@ model TransporteurProfil {
 
   @@index([latitude, longitude])
   @@index([disponible])
+  @@index([positionDepartement, disponible, derniereMAJ])
+  @@index([positionRegion])
+  @@index([disponibleJusqua])
 }
 
 model CommissionnaireProfil {
@@ -227,9 +246,15 @@ model Annonce {
   villeDepart String
   latDepart   Float
   lngDepart   Float
+  // Commune de départ (résolue côté serveur) et sa zone
+  inseeDepart       String?
+  departementDepart String?
+  regionDepart      String?
 
   // Destination souhaitée — vide = toutes directions
-  villeArrivee String?
+  villeArrivee       String?
+  inseeArrivee       String?
+  departementArrivee String?
 
   dateDisponibilite    DateTime
   dateDisponibiliteFin DateTime?
@@ -243,6 +268,8 @@ model Annonce {
   @@index([latDepart, lngDepart])
   @@index([dateDisponibilite])
   @@index([active, dateDisponibilite])
+  @@index([departementDepart, active])
+  @@index([regionDepart])
 }
 
 // ─── Avis ─────────────────────────────────────────────────────────────────────
@@ -360,11 +387,14 @@ model Alerte {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  villeDepart  String
-  latDepart    Float
-  lngDepart    Float
+  // Alerte autour d'une ville (rayon) …
+  villeDepart  String?
+  latDepart    Float?
+  lngDepart    Float?
   rayonKm      Int     @default(100)
   villeArrivee String?
+  // … et/ou par départements ("préviens-moi quand un transporteur est disponible dans le 57 ou le 67")
+  departements String[] @default([])
 
   actif           Boolean   @default(true)
   derniereNotifLe DateTime?
@@ -459,4 +489,25 @@ model DocumentContenu {
   documentId String   @id
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   donnees    Bytes // version(1) | iv(12) | tag(16) | texte chiffré
+}
+
+// ─── Référentiel géographique ─────────────────────────────────────────────────
+// Données officielles (API geo.api.gouv.fr), chargées par la migration — jamais par le seed.
+// latitude/longitude d'un département : commune la plus proche du barycentre de ses communes (placement des bulles de la carte).
+
+model Region {
+  code         String        @id
+  nom          String
+  departements Departement[]
+}
+
+model Departement {
+  code       String @id
+  nom        String
+  regionCode String
+  region     Region @relation(fields: [regionCode], references: [code])
+  latitude   Float
+  longitude  Float
+
+  @@index([regionCode])
 }

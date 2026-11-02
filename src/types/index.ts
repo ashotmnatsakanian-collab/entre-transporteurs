@@ -83,9 +83,14 @@ export interface AnnonceRecherche {
   transporteurId: string
   userId: string
   villeDepart: string
+  latDepart: number
+  lngDepart: number
+  departementDepart: string | null
   villeArrivee: string | null
+  departementArrivee: string | null
   dateDisponibilite: string
   dateDisponibiliteFin: string | null
+  createdAt: string
   commentaire: string | null
   raisonSociale: string
   disponible: boolean
@@ -96,7 +101,7 @@ export interface AnnonceRecherche {
   nb_avis: number
   vehiculeType: TypeVehicule | null
   vehiculeChargeUtile: number | null
-  distance_km: number
+  distance_km: number | null
 }
 
 export const TYPE_VEHICULE_LABELS: Record<TypeVehicule, string> = {

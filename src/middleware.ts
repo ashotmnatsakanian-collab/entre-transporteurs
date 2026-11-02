@@ -7,7 +7,7 @@ const estProduction = process.env.NODE_ENV === 'production'
 const PAGES_PROTEGEES = ['/carte', '/transporteur', '/commissionnaire', '/profils', '/messages', '/compte', '/admin', '/accepter-cgu', '/abonnement/succes', '/abonnement/reactivation']
 const API_PROTEGEES = [
   '/api/transporteurs', '/api/commissionnaires', '/api/vehicules', '/api/recherche', '/api/messages',
-  '/api/annonces', '/api/avis', '/api/besoins', '/api/alertes', '/api/documents', '/api/compte', '/api/signalements',
+  '/api/annonces', '/api/avis', '/api/besoins', '/api/alertes', '/api/carte', '/api/documents', '/api/compte', '/api/signalements',
   '/api/admin', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/renvoyer-verification',
 ]
 
@@ -38,7 +38,7 @@ function ajouterEntetesSecurite(res: NextResponse, csp: string) {
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('X-Frame-Options', 'DENY')
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
+  res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(), usb=()')
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
   res.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
   if (estProduction) res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains')

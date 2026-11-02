@@ -1,15 +1,15 @@
 import { db } from '@/lib/db'
 import { rechercheSchema } from '@/lib/validations/recherche'
-import { rechercherParRayon } from '@/lib/geo'
+import { rechercherTransporteurs } from '@/lib/geo'
 import { exigerAccesCommissionnaire, gerer, json, limiter, lireJson } from '@/lib/api'
 
-// POST /api/recherche — recherche géolocalisée de transporteurs (commissionnaire avec accès)
+// POST /api/recherche — transporteurs disponibles maintenant, par rayon / départements / région (commissionnaire avec accès)
 export const POST = gerer(async (req) => {
   const u = await exigerAccesCommissionnaire()
   limiter(req, 'recherche', 120, 60_000, u.id)
   const filtres = await lireJson(req, rechercheSchema)
 
-  const transporteurs = await rechercherParRayon(filtres.lat, filtres.lng, filtres.rayonKm, filtres.disponibleSeulement)
+  const transporteurs = await rechercherTransporteurs(filtres)
   if (transporteurs.length === 0) return json([])
 
   const vehicules = await db.vehicule.findMany({

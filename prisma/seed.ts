@@ -1,11 +1,23 @@
 import { PrismaClient, Role, TypeVehicule, Specificite, StatutAbonnement } from '@prisma/client'
 import { VERSION_CGU } from '../src/lib/legal'
+import { departement, departementDepuisInsee } from '../src/lib/referentiel-geo'
 import { hash } from 'bcryptjs'
 import { addDays } from 'date-fns'
 
 const db = new PrismaClient()
 
 const MOT_DE_PASSE = 'Password123!'
+
+// Communes de démonstration (code INSEE) : département et région sont déduits du référentiel officiel
+const COMMUNES_DEMO: Record<string, string> = {
+  Paris: '75056', Lyon: '69123', Marseille: '13055', Bordeaux: '33063', Toulouse: '31555',
+  Nantes: '44109', Lille: '59350', Strasbourg: '67482', Rennes: '35238', Montpellier: '34172',
+}
+function zoneDeLaCommune(nom: string) {
+  const insee = COMMUNES_DEMO[nom]
+  const dept = departement(departementDepuisInsee(insee))!
+  return { insee, departement: dept.code, region: dept.region }
+}
 
 const TRANSPORTEURS = [
   { nom: 'Jean Dupont', email: 'jean.dupont@dupont-transport.fr', tel: '0601020304', siret: '12345678900001', rs: 'SARL Dupont Transport', lat: 48.8566, lng: 2.3522, zones: ['75', '77', '78', '91', '92', '93', '94', '95'], dispo: true, desc: 'Spécialiste du transport régional parisien depuis 15 ans.' },
@@ -122,6 +134,21 @@ async function main() {
     })
 
     const profil = user.transporteurProfil!
+
+    // Position actuelle (commune) et disponibilité fraîche : relancer le seed les rafraîchit (elles expirent à 24 h)
+    const villeDemo = Object.keys(COMMUNES_DEMO)[TRANSPORTEURS.indexOf(t)] ?? 'Paris'
+    const zone = zoneDeLaCommune(villeDemo)
+    const rang = TRANSPORTEURS.indexOf(t)
+    await db.transporteurProfil.update({
+      where: { id: profil.id },
+      data: {
+        positionVille: villeDemo, positionInsee: zone.insee, positionDepartement: zone.departement, positionRegion: zone.region,
+        disponible: t.dispo,
+        disponibleJusqua: t.dispo ? new Date(Date.now() + (8 + rang) * 3_600_000) : null,
+        derniereMAJ: new Date(Date.now() - (5 + rang * 17) * 60_000),
+        rayonInterventionKm: t.dispo ? 150 + rang * 20 : null,
+      },
+    })
     const vehiculesData = VEHICULES[t.email] ?? []
     for (const v of vehiculesData) {
       await db.vehicule.upsert({
@@ -176,6 +203,12 @@ async function main() {
     const user = await db.user.findUnique({ where: { email: a.email }, include: { transporteurProfil: true } })
     if (!user?.transporteurProfil) continue
     const ville = VILLES[a.depart]
+    const zoneDepart = zoneDeLaCommune(a.depart)
+    const zoneArrivee = a.arrivee && COMMUNES_DEMO[a.arrivee] ? zoneDeLaCommune(a.arrivee) : null
+    const communes = {
+      inseeDepart: zoneDepart.insee, departementDepart: zoneDepart.departement, regionDepart: zoneDepart.region,
+      inseeArrivee: zoneArrivee?.insee ?? null, departementArrivee: zoneArrivee?.departement ?? null,
+    }
     const dates = {
       dateDisponibilite: addDays(new Date(), a.dansXJours),
       dateDisponibiliteFin: addDays(new Date(), a.dansXJours + a.dureeJours),
@@ -184,7 +217,7 @@ async function main() {
       where: { transporteurId: user.transporteurProfil.id, villeDepart: a.depart, villeArrivee: a.arrivee },
     })
     if (existante) {
-      await db.annonce.update({ where: { id: existante.id }, data: { ...dates, active: true } })
+      await db.annonce.update({ where: { id: existante.id }, data: { ...dates, ...communes, active: true } })
     } else {
       await db.annonce.create({
         data: {
@@ -195,6 +228,7 @@ async function main() {
           lngDepart: ville.lng,
           villeArrivee: a.arrivee,
           commentaire: a.commentaire,
+          ...communes,
           ...dates,
         },
       })

@@ -7,6 +7,7 @@ import { db } from './db'
 import { emailActif } from './email'
 import { aAccesPayant } from './acces'
 import { utilisateurEstConforme } from './documents'
+import { ErreurCommune, resoudreCommune, type Commune } from './communes'
 import { VERSION_CGU } from './legal'
 import { consommer } from './rate-limit'
 import { ipClient } from './ip'
@@ -180,6 +181,16 @@ export async function exigerAccesCommissionnaire(): Promise<Utilisateur> {
   if (!(await aAccesPayant(u.id))) throw new ApiError(402, 'Abonnement requis', { code: 'ABONNEMENT_REQUIS' })
   await exigerConformite(u.id)
   return u
+}
+
+/** Commune retrouvée auprès de l'API officielle à partir de son code INSEE (jamais de coordonnées fournies par le client). */
+export async function communeOuErreur(insee: string): Promise<Commune> {
+  try {
+    return await resoudreCommune(insee)
+  } catch (err) {
+    if (err instanceof ErreurCommune) throw new ApiError(err.status, err.message)
+    throw err
+  }
 }
 
 /** Documents légaux validés (quand ils sont exigés) : condition pour publier, se déclarer disponible, chercher ou contacter. */

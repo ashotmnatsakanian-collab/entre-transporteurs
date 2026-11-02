@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { codeDepartementSchema, inseeSchema } from './position'
 import { emailSchema, motDePasseSchema } from './profil'
 
 export const messageCreationSchema = z.object({
@@ -8,7 +9,6 @@ export const messageCreationSchema = z.object({
 
 export const contenuMessageSchema = z.string().trim().min(1).max(2000)
 
-export const disponibiliteSchema = z.object({ disponible: z.boolean() })
 
 export const signalementSchema = z.object({
   cibleId: z.string().min(1).max(40),
@@ -35,13 +35,15 @@ export const suppressionCompteSchema = z.object({
   confirmation: z.literal('SUPPRIMER'),
 })
 
-export const alerteSchema = z.object({
-  villeDepart: z.string().trim().min(2).max(100),
-  latDepart: z.number().min(-90).max(90),
-  lngDepart: z.number().min(-180).max(180),
-  rayonKm: z.number().int().min(10).max(500).default(100),
-  villeArrivee: z.string().trim().max(100).optional().nullable().transform((v) => v || null),
-})
+// Alerte autour d'une ville (code INSEE, rayon) et/ou sur des départements : « préviens-moi quand un transporteur est disponible dans le 57 ou le 67 »
+export const alerteSchema = z
+  .object({
+    inseeDepart: inseeSchema.nullable().optional().transform((v) => v ?? null),
+    rayonKm: z.number().int().min(10).max(500).default(100),
+    villeArrivee: z.string().trim().max(100).optional().nullable().transform((v) => v || null),
+    departements: z.array(codeDepartementSchema).max(15).default([]),
+  })
+  .refine((a) => a.inseeDepart || a.departements.length > 0, { message: 'Indiquez une ville ou au moins un département.', path: ['departements'] })
 
 export const besoinSchema = z.object({
   villeDepart: z.string().trim().min(2).max(100),

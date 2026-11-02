@@ -1,14 +1,13 @@
 import { z } from 'zod'
 
-const ville = z.string().trim().min(2, 'Ville requise').max(100)
+import { inseeSchema } from './position'
 
+// Les communes sont désignées par leur code INSEE : le serveur retrouve lui-même le nom, le centre, le département et la région.
 export const annonceSchema = z
   .object({
     vehiculeId: z.string().min(1).max(40).optional().nullable(),
-    villeDepart: ville,
-    latDepart: z.number().min(-90).max(90),
-    lngDepart: z.number().min(-180).max(180),
-    villeArrivee: z.string().trim().max(100).optional().nullable().transform((v) => v || null),
+    inseeDepart: inseeSchema,
+    inseeArrivee: z.preprocess((v) => (v === '' ? null : v), inseeSchema.nullable().optional()).transform((v) => v ?? null),
     dateDisponibilite: z.coerce.date(),
     dateDisponibiliteFin: z.coerce.date().optional().nullable(),
     commentaire: z.string().trim().max(500).optional().nullable().transform((v) => v || null),
@@ -29,13 +28,3 @@ export const annonceSchema = z
 export type AnnonceInput = z.infer<typeof annonceSchema>
 
 export const annoncePatchSchema = z.object({ active: z.boolean() })
-
-export const rechercheAnnonceSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  rayonKm: z.number().min(1).max(1000).default(150),
-  date: z.coerce.date().optional(),
-  villeArrivee: z.string().trim().max(100).optional(),
-})
-
-export type RechercheAnnonceInput = z.infer<typeof rechercheAnnonceSchema>

@@ -140,3 +140,18 @@ export function emailDocumentsExpiration(nom: string, lignes: string[], url: str
     texte: `Bonjour ${nom},\n\nCes documents expirent bientôt (sans renouvellement, ${consequence}) :\n- ${lignes.join('\n- ')}\n\n${url}\n`,
   }
 }
+
+export function emailRenouvellementDisponibilite(nom: string, ville: string | null, jusqua: string, url: string): Email {
+  const lieu = ville ? ` à ${ville}` : ''
+  return {
+    to: '',
+    sujet: 'Votre disponibilité expire bientôt',
+    html: gabarit(
+      'Toujours disponible ?',
+      `<p>Bonjour ${echapperHtml(nom)}, votre disponibilité${echapperHtml(lieu)} est valable ${echapperHtml(jusqua)}. Une fois expirée, vous n'apparaissez plus dans les recherches des commissionnaires.</p><p>Si vous êtes toujours disponible, renouvelez-la en un clic.</p>`,
+      'Renouveler ma disponibilité',
+      url
+    ),
+    texte: `Bonjour ${nom},\n\nVotre disponibilité${lieu} est valable ${jusqua}. Une fois expirée, vous n'apparaissez plus dans les recherches des commissionnaires.\nToujours disponible ? Renouvelez-la en un clic :\n${url}\n`,
+  }
+}

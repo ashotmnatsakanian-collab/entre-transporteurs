@@ -14,9 +14,7 @@ export const profilTransporteurSchema = z.object({
   siret: siretSchema,
   raisonSociale: texteCourt(2, 100),
   description: z.string().trim().max(500).optional().nullable(),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  zonesCirculation: z.array(z.string().max(4)).max(20).default([]),
+  // La position (commune) et la zone d'intervention se règlent à part : /api/transporteurs/position et /zone
 })
 
 export const profilCommissionnaireSchema = z.object({

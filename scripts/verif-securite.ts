@@ -16,6 +16,7 @@ import { hash } from 'bcryptjs'
 import { creerToken } from '../src/lib/tokens'
 import { VERSION_CGU } from '../src/lib/legal'
 import { purgerDonneesExpirees, purgerDocuments } from '../src/lib/purge'
+import { expirerDisponibilites, purgerPositions, rappelerRenouvellements } from '../src/lib/disponibilites-jobs'
 import { recalculerConformite } from '../src/lib/documents'
 import { trouverOuCreerConversation } from '../src/lib/conversations'
 import { OBLIGATOIRES_PAR_ROLE } from '../src/lib/documents-regles'
@@ -263,21 +264,23 @@ async function main() {
 
   // ── 7. Validation des entrées ────────────────────────────────────────────────
   section('Validation des entrées')
-  const baseAnnonce = { villeDepart: 'Lyon', latDepart: 45.76, lngDepart: 4.83, dateDisponibilite: new Date(Date.now() + 86_400_000).toISOString() }
+  const baseAnnonce = { inseeDepart: '69123', dateDisponibilite: new Date(Date.now() + 86_400_000).toISOString() }
   verifier('JSON invalide → 400', (await jean.requete('/api/annonces', { method: 'POST', corps: '{pas du json', headers: { 'content-type': 'application/json' } })).statut === 400)
-  verifier('champs manquants → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { villeDepart: 'Lyon' } })).statut === 400)
-  verifier('latitude hors limites → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, latDepart: 999 } })).statut === 400)
+  verifier('champs manquants → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { commentaire: 'x' } })).statut === 400)
+  verifier('code commune invalide → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, inseeDepart: 'Lyon' } })).statut === 400)
+  verifier('code commune inconnu → 404', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, inseeDepart: '99999' } })).statut === 404)
   verifier('date passée → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, dateDisponibilite: '2020-01-01' } })).statut === 400)
   verifier('corps de 200 Ko → 413', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, commentaire: 'x'.repeat(200_000) } })).statut === 413)
   verifier('véhicule appartenant à un autre → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, vehiculeId: vehiculeMarie.id } })).statut === 400)
-  const injection = await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, villeDepart: "Lyon'; DROP TABLE \"User\"; --", commentaire: '<script>alert(1)</script>' } })
+  verifier('injection dans le code commune → 400', (await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, inseeDepart: "69123' OR 1=1; --" } })).statut === 400)
+  const injection = await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, commentaire: "Lyon'; DROP TABLE \"User\"; -- <script>alert(1)</script>" } })
   verifier("tentative d'injection SQL/XSS stockée telle quelle, sans effet (201)", injection.statut === 201, `statut ${injection.statut}`)
   const idInjection = (injection.donnees as { id?: string })?.id
   verifier('la table User existe toujours', (await db.user.count()) > 0)
   const recInj = await francois.requete('/api/annonces?lat=48.85&lng=2.35&villeArrivee=%25%27%3B--&rayonKm=999')
   verifier('paramètres de recherche malveillants gérés sans erreur 500', recInj.statut === 200, `statut ${recInj.statut}`)
   if (idInjection) await db.annonce.delete({ where: { id: idInjection } })
-  verifier('SIRET à clé de contrôle invalide → 400', (await jean.requete('/api/transporteurs', { method: 'PUT', json: { siret: '12345678900001', raisonSociale: 'Test', latitude: 48, longitude: 2 } })).statut === 400)
+  verifier('SIRET à clé de contrôle invalide → 400', (await jean.requete('/api/transporteurs', { method: 'PUT', json: { siret: '12345678900001', raisonSociale: 'Test' } })).statut === 400)
 
   // ── 8. Force brute ───────────────────────────────────────────────────────────
   section('Protection contre la force brute')
@@ -372,7 +375,7 @@ async function main() {
   verifier('besoin avec date passée refusé (400)', (await francois.requete('/api/besoins', { method: 'POST', json: { villeDepart: 'Lyon', latDepart: 45.76, lngDepart: 4.83, villeArrivee: 'Paris', dateEnlevement: '2020-01-01' } })).statut === 400)
   verifier('le propriétaire supprime son besoin (200)', (await francois.requete(`/api/besoins/${idBesoin}`, { method: 'DELETE' })).statut === 200)
 
-  const alerte = await francois.requete('/api/alertes', { method: 'POST', json: { villeDepart: 'Lyon', latDepart: 45.76, lngDepart: 4.83, rayonKm: 100, villeArrivee: '100%_joker' } })
+  const alerte = await francois.requete('/api/alertes', { method: 'POST', json: { inseeDepart: '69123', rayonKm: 100, villeArrivee: '100%_joker' } })
   verifier('création d’une alerte (201)', alerte.statut === 201, `statut ${alerte.statut}`)
   verifier('les jokers SQL sont neutralisés dans une alerte', !/[%_]/.test((alerte.donnees as { villeArrivee?: string })?.villeArrivee ?? ''))
   verifier("un autre utilisateur ne peut pas supprimer l'alerte (404)", (await isabelle.requete(`/api/alertes/${(alerte.donnees as { id: string }).id}`, { method: 'DELETE' })).statut === 404)
@@ -476,7 +479,7 @@ async function main() {
     data: {
       email: emailTd, nom: 'Transporteur Documents', role: 'TRANSPORTEUR', password: await hash(MOT_DE_PASSE, 10),
       emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
-      transporteurProfil: { create: { siret: '', raisonSociale: 'Docs Test', latitude: 48.8566, longitude: 2.3522, disponible: true, vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000 } } } },
+      transporteurProfil: { create: { siret: '', raisonSociale: 'Docs Test', latitude: 48.8566, longitude: 2.3522, positionVille: 'Paris', positionInsee: '75056', positionDepartement: '75', positionRegion: '11', disponibleJusqua: new Date(Date.now() + 86_400_000), disponible: true, vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000 } } } },
     },
     include: { transporteurProfil: true },
   })
@@ -600,6 +603,8 @@ async function main() {
     verifier("non conforme : n'ouvre pas de conversation (403)", (await td.requete('/api/messages', { method: 'POST', json: { destinataireId: francoisUser.id } })).statut === 403)
     verifier("non conforme : un commissionnaire ne peut pas l'aborder (404)", (await isabelle.requete('/api/messages', { method: 'POST', json: { destinataireId: tdUser.id } })).statut === 404)
     await recalculerConformite(tdUser.id)
+    // Il s'était déclaré indisponible plus haut : redevenu conforme, il peut se déclarer de nouveau disponible
+    verifier('redevenu conforme : « disponible maintenant » de nouveau possible (200)', (await td.requete('/api/transporteurs/disponibilite', { method: 'PATCH', json: { disponible: true } })).statut === 200)
     verifier('conforme à nouveau après recalcul : visible', await estVisible())
   }
 
@@ -645,7 +650,7 @@ async function main() {
     verifier('commissionnaire non conforme : recherche refusée (403 DOCUMENTS_REQUIS)', rech.statut === 403 && (rech.donnees as { code?: string })?.code === 'DOCUMENTS_REQUIS')
     verifier('commissionnaire non conforme : recherche d’annonces refusée (403)', (await cd.requete('/api/annonces?lat=48.85&lng=2.35&rayonKm=50')).statut === 403)
     verifier('commissionnaire non conforme : publication de besoin refusée (403)', (await cd.requete('/api/besoins', { method: 'POST', json: { villeDepart: 'Paris', latDepart: 48.85, lngDepart: 2.35, villeArrivee: 'Lyon', dateEnlevement: new Date(Date.now() + 2 * 86_400_000).toISOString() } })).statut === 403)
-    verifier('commissionnaire non conforme : création d’alerte refusée (403)', (await cd.requete('/api/alertes', { method: 'POST', json: { villeDepart: 'Paris', latDepart: 48.85, lngDepart: 2.35, rayonKm: 50 } })).statut === 403)
+    verifier('commissionnaire non conforme : création d’alerte refusée (403)', (await cd.requete('/api/alertes', { method: 'POST', json: { inseeDepart: '75056', rayonKm: 50 } })).statut === 403)
     verifier("commissionnaire non conforme : n'ouvre pas de conversation (403)", (await cd.requete('/api/messages', { method: 'POST', json: { destinataireId: jeanUser.id } })).statut === 403)
     for (const page of ['/carte', '/commissionnaire/recherche', '/commissionnaire/besoins']) {
       const r = await cd.requete(page)
@@ -697,7 +702,7 @@ async function main() {
     data: {
       email: emailSusp, nom: 'Suspendu Test', role: 'TRANSPORTEUR', password: await hash(MOT_DE_PASSE, 10), suspendu: true, documentsConformesJusqua: new Date(Date.now() + 365 * 86_400_000),
       emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
-      transporteurProfil: { create: { siret: '', raisonSociale: 'Suspendu Test', latitude: 48.8566, longitude: 2.3522, disponible: true, vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000, immatriculation: 'ZZ-000-ZZ' } } } },
+      transporteurProfil: { create: { siret: '', raisonSociale: 'Suspendu Test', latitude: 48.8566, longitude: 2.3522, positionVille: 'Paris', positionInsee: '75056', positionDepartement: '75', positionRegion: '11', disponibleJusqua: new Date(Date.now() + 86_400_000), disponible: true, vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000, immatriculation: 'ZZ-000-ZZ' } } } },
     },
     include: { transporteurProfil: true },
   })
@@ -707,6 +712,176 @@ async function main() {
 
   await db.conversation.deleteMany({ where: { cle: [isabelleUser.id, tdUser.id].sort().join(':') } })
   await db.user.delete({ where: { id: tdUser.id } })
+
+  // ── Position, zones et disponibilité ─────────────────────────────────────────
+  section('Position (commune), zones, expiration de la disponibilité')
+  const hex = () => randomBytes(3).toString('hex')
+  const creerTransporteur = async (prefixe: string, avecPosition: boolean) => {
+    const email = `${prefixe}-${hex()}@example.invalid`
+    const user = await db.user.create({
+      data: {
+        email, nom: 'Transporteur Position', role: 'TRANSPORTEUR', password: await hash(MOT_DE_PASSE, 10),
+        emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
+        documentsConformesJusqua: process.env.EXIGER_DOCUMENTS === 'true' ? new Date(Date.now() + 365 * 86_400_000) : null,
+        transporteurProfil: { create: { siret: '', raisonSociale: `Position ${prefixe}`, latitude: 46.6034, longitude: 1.8883, ...(avecPosition ? {} : {}), vehicules: { create: { type: 'SEMI', chargeUtile: 24000 } } } },
+      },
+      include: { transporteurProfil: true },
+    })
+    const client = new Client(prefixe)
+    await client.connecter(email)
+    return { user, client, profilId: user.transporteurProfil!.id }
+  }
+  const pz = await creerTransporteur('pz', false)
+  const sansPosition = await creerTransporteur('pz-sans', false)
+  const dansLePasse = (ms: number) => new Date(Date.now() - ms)
+
+  verifier('position sans session refusée (401)', (await anon.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463' } })).statut === 401)
+  verifier('un commissionnaire ne peut pas définir de position (403)', (await francois.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463' } })).statut === 403)
+  verifier('des coordonnées GPS seules sont refusées (400)', (await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { latitude: 49.1193, longitude: 6.1757 } })).statut === 400)
+  verifier('un code commune invalide est refusé (400)', (await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: "57463' OR 1=1" } })).statut === 400)
+  verifier('une durée non autorisée est refusée (400)', (await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463', dureeHeures: 99 } })).statut === 400)
+  verifier('une commune inexistante est refusée (404)', (await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '99999' } })).statut === 404)
+  verifier("se déclarer disponible sans avoir indiqué sa position est refusé (400)", (await sansPosition.client.requete('/api/transporteurs/disponibilite', { method: 'PATCH', json: { disponible: true } })).statut === 400)
+
+  // Le serveur retrouve lui-même la commune : les coordonnées envoyées sont ignorées, seul le centre de la commune est enregistré
+  const posee = await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463', latitude: 1.234567, longitude: 2.345678, positionDepartement: '75' } })
+  verifier('position définie par code commune (200)', posee.statut === 200, `statut ${posee.statut} ${posee.texte.slice(0, 120)}`)
+  const apresPosition = await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })
+  verifier('commune, département et région retrouvés par le serveur (Metz, 57, 44)', apresPosition.positionVille === 'Metz' && apresPosition.positionDepartement === '57' && apresPosition.positionRegion === '44' && apresPosition.positionInsee === '57463')
+  verifier("seul le CENTRE de la commune est enregistré (jamais une coordonnée exacte envoyée par le client)", Math.abs(apresPosition.latitude - 49.1193) < 0.05 && Math.abs(apresPosition.longitude - 6.1757) < 0.05)
+  verifier('disponible par défaut pour 24 h, mise à jour horodatée', apresPosition.disponible && !!apresPosition.disponibleJusqua && Math.abs(apresPosition.disponibleJusqua.getTime() - (Date.now() + 24 * 3_600_000)) < 120_000 && Date.now() - apresPosition.derniereMAJ.getTime() < 60_000)
+  const etat = (await pz.client.requete('/api/transporteurs/position')).donnees as { disponible: boolean; positionDepartement: string }
+  verifier('lecture de ma position (200)', etat.disponible === true && etat.positionDepartement === '57')
+
+  const courte = await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463', dureeHeures: 4 } })
+  const apresCourte = await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })
+  verifier('durée réglable : 4 h', courte.statut === 200 && apresCourte.dureeDisponibiliteH === 4 && Math.abs(apresCourte.disponibleJusqua!.getTime() - (Date.now() + 4 * 3_600_000)) < 120_000)
+  await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463', dureeHeures: 48 } })
+
+  // Zone d'intervention
+  verifier('département inconnu dans la zone refusé (400)', (await pz.client.requete('/api/transporteurs/zone', { method: 'PUT', json: { departements: ['99'] } })).statut === 400)
+  verifier("rayon d'intervention trop petit refusé (400)", (await pz.client.requete('/api/transporteurs/zone', { method: 'PUT', json: { rayonInterventionKm: 5 } })).statut === 400)
+  verifier('destination inconnue refusée (404)', (await pz.client.requete('/api/transporteurs/zone', { method: 'PUT', json: { destinationInsee: '99999' } })).statut === 404)
+  verifier("un commissionnaire ne peut pas modifier une zone d'intervention (403)", (await francois.requete('/api/transporteurs/zone', { method: 'PUT', json: { departements: ['57'] } })).statut === 403)
+  const zoneOk = await pz.client.requete('/api/transporteurs/zone', { method: 'PUT', json: { departements: ['67', '54'], rayonInterventionKm: 150, destinationInsee: '69123' } })
+  verifier("zone d'intervention enregistrée (200), destination retrouvée par le serveur", zoneOk.statut === 200 && (zoneOk.donnees as { destinationVille: string }).destinationVille === 'Lyon')
+
+  // Recherche par zone (commissionnaire avec accès)
+  const cherche = async (json: object) => {
+    const r = await francois.requete('/api/recherche', { method: 'POST', json })
+    return { statut: r.statut, lignes: (Array.isArray(r.donnees) ? r.donnees : []) as Array<{ id: string; via_intervention: boolean; distance_km: number | null; derniereMAJ: string; positionVille: string }> }
+  }
+  const trouve = (r: { lignes: Array<{ id: string }> }) => r.lignes.some((t) => t.id === pz.profilId)
+  const parDept57 = await cherche({ departements: ['57'] })
+  verifier('recherche par département : trouvé dans son département', parDept57.statut === 200 && trouve(parDept57) && parDept57.lignes.find((t) => t.id === pz.profilId)!.via_intervention === false)
+  verifier('recherche par plusieurs départements (57 et 75)', trouve(await cherche({ departements: ['75', '57'] })))
+  const parDept67 = await cherche({ departements: ['67'] })
+  verifier("recherche par département : trouvé aussi là où il accepte d'aller (signalé)", trouve(parDept67) && parDept67.lignes.find((t) => t.id === pz.profilId)!.via_intervention === true)
+  verifier('recherche par département : absent hors de sa zone', !trouve(await cherche({ departements: ['75'] })))
+  verifier('recherche par région : trouvé en Grand Est', trouve(await cherche({ region: '44' })))
+  verifier('recherche par région : absent en Bretagne', !trouve(await cherche({ region: '53' })))
+  const rayonMetz = await cherche({ lat: 49.1193, lng: 6.1757, rayonKm: 30 })
+  verifier('recherche par rayon : trouvé près de Metz, avec sa distance', trouve(rayonMetz) && rayonMetz.lignes.find((t) => t.id === pz.profilId)!.distance_km! < 5)
+  verifier('recherche par rayon : absent à Paris (50 km), hors de sa zone d’intervention', !trouve(await cherche({ lat: 48.8566, lng: 2.3522, rayonKm: 50 })))
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { rayonInterventionKm: 400 } })
+  const viaRayon = await cherche({ lat: 48.8566, lng: 2.3522, rayonKm: 50 })
+  verifier("recherche par rayon : trouvé à Paris parce qu'il accepte de se déplacer jusqu'à 400 km (signalé)", trouve(viaRayon) && viaRayon.lignes.find((t) => t.id === pz.profilId)!.via_intervention === true)
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { rayonInterventionKm: 150 } })
+  const large = await cherche({ lat: 46.6, lng: 1.9, rayonKm: 1000 })
+  const dates = large.lignes.map((t) => new Date(t.derniereMAJ).getTime())
+  verifier('résultats triés par fraîcheur : dernière mise à jour en premier', large.lignes.length > 2 && dates.every((d, i) => i === 0 || dates[i - 1] >= d))
+  verifier('validation : aucune zone → 400', (await francois.requete('/api/recherche', { method: 'POST', json: {} })).statut === 400)
+  verifier('validation : département inconnu → 400', (await francois.requete('/api/recherche', { method: 'POST', json: { departements: ['99'] } })).statut === 400)
+  verifier('validation : liste de départements vide → 400', (await francois.requete('/api/recherche', { method: 'POST', json: { departements: [] } })).statut === 400)
+  verifier('validation : trop de départements → 400', (await francois.requete('/api/recherche', { method: 'POST', json: { departements: Array(13).fill('57') } })).statut === 400)
+  verifier('un transporteur ne peut pas chercher par zone (403)', (await jean.requete('/api/recherche', { method: 'POST', json: { departements: ['57'] } })).statut === 403)
+
+  // Annonces datées : communes retrouvées par le serveur, filtres par zone
+  const annoncePz = await pz.client.requete('/api/annonces', { method: 'POST', json: { inseeDepart: '57463', inseeArrivee: '69123', latDepart: 1, lngDepart: 1, villeDepart: 'Ailleurs', departementDepart: '75', dateDisponibilite: new Date(Date.now() + 86_400_000).toISOString() } })
+  verifier('annonce par code commune (201)', annoncePz.statut === 201, `statut ${annoncePz.statut}`)
+  const idAnnoncePz = (annoncePz.donnees as { id?: string })?.id ?? ''
+  const annonceEnBase = await db.annonce.findUniqueOrThrow({ where: { id: idAnnoncePz } })
+  verifier('commune, départements et région de l’annonce retrouvés par le serveur (coordonnées envoyées ignorées)', annonceEnBase.villeDepart === 'Metz' && annonceEnBase.departementDepart === '57' && annonceEnBase.regionDepart === '44' && annonceEnBase.departementArrivee === '69' && Math.abs(annonceEnBase.latDepart - 49.1193) < 0.05)
+  const annoncesDe = async (q: string) => JSON.stringify((await francois.requete(`/api/annonces?${q}`)).donnees ?? '').includes(idAnnoncePz)
+  verifier('annonces par département', await annoncesDe('departements=57') && await annoncesDe('departements=75,57') && !(await annoncesDe('departements=75')))
+  verifier('annonces par région', await annoncesDe('region=44') && !(await annoncesDe('region=53')))
+  verifier('annonces par rayon', await annoncesDe('lat=49.1193&lng=6.1757&rayonKm=20') && !(await annoncesDe('lat=48.8566&lng=2.3522&rayonKm=50')))
+  verifier('annonces : filtre « disponible maintenant »', await annoncesDe('departements=57&disponibleMaintenant=1'))
+  verifier('annonces : filtre type de véhicule (aucun véhicule précisé → exclue)', !(await annoncesDe('departements=57&typeVehicule=SEMI')))
+  verifier('annonces : département invalide → 400', (await francois.requete('/api/annonces?departements=99')).statut === 400)
+  verifier('annonces : aucune zone → 400', (await francois.requete('/api/annonces')).statut === 400)
+  const teaser = await anon.requete('/')
+  verifier("l'aperçu public n'affiche que le département, jamais la commune", teaser.statut === 200 && teaser.texte.includes('Moselle (57)') && !teaser.texte.includes('Metz'))
+
+  // Carte : compteurs par département, aucune position individuelle
+  const carte = await francois.requete('/api/carte')
+  const zones = ((carte.donnees as { zones?: Array<{ code: string; nb: number }> })?.zones ?? [])
+  verifier('carte : compteurs par département (200)', carte.statut === 200 && (zones.find((z) => z.code === '57')?.nb ?? 0) >= 1)
+  verifier('carte : aucune donnée individuelle (ni nom, ni identifiant, ni coordonnées d’un transporteur)', !/raisonSociale|userId|telephone|@/.test(carte.texte) && zones.every((z) => Object.keys(z).sort().join() === 'code,latitude,longitude,nb,nom,region'))
+  verifier('carte : réservée aux commissionnaires (403 pour un transporteur, 401 sans session)', (await jean.requete('/api/carte')).statut === 403 && (await anon.requete('/api/carte')).statut === 401)
+
+  // Temps réel : la carte est prévenue d'un changement
+  const sCarte = await connecterSocket(francois.cookieHeader())
+  let carteChange = false
+  sCarte.socket.on('carte-change', () => { carteChange = true })
+  sCarte.socket.emit('join-carte')
+  const sTransporteurCarte = await connecterSocket(jean.cookieHeader())
+  let intrus = false
+  sTransporteurCarte.socket.on('carte-change', () => { intrus = true })
+  sTransporteurCarte.socket.emit('join-carte')
+  await attendre(500)
+  await pz.client.requete('/api/transporteurs/disponibilite', { method: 'PATCH', json: { disponible: false } })
+  await attendre(900)
+  verifier('temps réel : la carte est prévenue quand un transporteur change de statut', carteChange)
+  verifier('temps réel : un transporteur ne reçoit pas les événements de la carte', !intrus)
+  sCarte.socket.close()
+  sTransporteurCarte.socket.close()
+  const etatArret = await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })
+  verifier('« je ne suis plus disponible » : indicateur coupé, échéance retirée', !etatArret.disponible && etatArret.disponibleJusqua === null)
+  verifier('un transporteur indisponible disparaît des recherches par zone', !trouve(await cherche({ departements: ['57'] })))
+
+  // Alertes par zone
+  verifier('alerte sans ville ni département refusée (400)', (await francois.requete('/api/alertes', { method: 'POST', json: {} })).statut === 400)
+  verifier('alerte avec département inconnu refusée (400)', (await francois.requete('/api/alertes', { method: 'POST', json: { departements: ['99'] } })).statut === 400)
+  const alerteZone = await francois.requete('/api/alertes', { method: 'POST', json: { departements: ['57', '67'] } })
+  const idAlerteZone = (alerteZone.donnees as { id?: string })?.id ?? ''
+  verifier('alerte par départements créée (201)', alerteZone.statut === 201 && ((alerteZone.donnees as { departements?: string[] }).departements ?? []).join() === '57,67')
+  await db.alerte.update({ where: { id: idAlerteZone }, data: { derniereNotifLe: null } })
+  await pz.client.requete('/api/transporteurs/position', { method: 'POST', json: { insee: '57463', dureeHeures: 24 } })
+  await attendre(2500)
+  verifier('alerte par zone déclenchée quand un transporteur devient disponible dans le 57', !!(await db.alerte.findUniqueOrThrow({ where: { id: idAlerteZone } })).derniereNotifLe)
+  await db.alerte.delete({ where: { id: idAlerteZone } })
+
+  // Expiration automatique
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { disponible: true, disponibleJusqua: dansLePasse(1000) } })
+  verifier("une disponibilité échue disparaît des recherches même avant le passage de la tâche de fond", !trouve(await cherche({ departements: ['57'] })))
+  verifier('…et de la carte (plus aucun compteur pour le département 57)', !((await francois.requete('/api/carte')).donnees as { zones: Array<{ code: string }> }).zones.some((z) => z.code === '57'))
+  verifier("la tâche de fond remet l'indicateur à jour", (await expirerDisponibilites()) >= 1 && !(await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })).disponible)
+  verifier('une échéance expirée interdit « disponible » à la lecture de ma position', ((await pz.client.requete('/api/transporteurs/position')).donnees as { disponible: boolean }).disponible === false)
+
+  // Rappel et renouvellement en un clic
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { disponible: true, disponibleJusqua: new Date(Date.now() + 3_600_000), dureeDisponibiliteH: 24, rappelDispoEnvoyeLe: null } })
+  verifier('rappel de renouvellement envoyé une fois à l’approche de l’échéance', (await rappelerRenouvellements()) >= 1 && !!(await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })).rappelDispoEnvoyeLe)
+  verifier('…et pas une deuxième fois', (await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })).rappelDispoEnvoyeLe !== null && (await rappelerRenouvellements()) === 0)
+  const jetonRenouvellement = await creerToken(pz.user.id, 'RENOUVELER_DISPONIBILITE', 3_600_000)
+  verifier('la page de renouvellement est publique (200)', (await anon.requete(`/renouveler-disponibilite?token=${jetonRenouvellement}`)).statut === 200)
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { disponible: false, disponibleJusqua: null } })
+  verifier('un jeton invalide est refusé (400)', (await anon.requete('/api/disponibilite/renouveler', { method: 'POST', json: { token: 'x'.repeat(40) } })).statut === 400)
+  const renouvele = await anon.requete('/api/disponibilite/renouveler', { method: 'POST', json: { token: jetonRenouvellement } })
+  verifier('renouvellement en un clic avec le jeton reçu par e-mail (200)', renouvele.statut === 200 && (await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })).disponible)
+  verifier('le jeton ne sert qu’une fois (400)', (await anon.requete('/api/disponibilite/renouveler', { method: 'POST', json: { token: jetonRenouvellement } })).statut === 400)
+  verifier('un jeton de réinitialisation de mot de passe ne renouvelle rien (400)', (await anon.requete('/api/disponibilite/renouveler', { method: 'POST', json: { token: await creerToken(pz.user.id, 'REINITIALISATION_MDP', 3_600_000) } })).statut === 400)
+
+  // Conservation : une position non mise à jour depuis 30 jours est effacée
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { disponible: false, disponibleJusqua: null, derniereMAJ: dansLePasse(31 * 86_400_000) } })
+  verifier('la purge efface les positions inchangées depuis 30 jours', (await purgerPositions()) >= 1)
+  const purge = await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })
+  verifier('…position, département, région et destination effacés', !purge.positionVille && !purge.positionInsee && !purge.positionDepartement && !purge.positionRegion && !purge.destinationVille)
+  await db.transporteurProfil.update({ where: { id: pz.profilId }, data: { positionInsee: '57463', positionVille: 'Metz', positionDepartement: '57', derniereMAJ: dansLePasse(2 * 86_400_000) } })
+  verifier('une position récente est conservée', (await purgerPositions()) === 0 || !!(await db.transporteurProfil.findUniqueOrThrow({ where: { id: pz.profilId } })).positionInsee)
+
+  await db.annonce.deleteMany({ where: { transporteurId: pz.profilId } })
+  await db.user.deleteMany({ where: { id: { in: [pz.user.id, sansPosition.user.id] } } })
 
   // ── 11. Sockets ──────────────────────────────────────────────────────────────
   section('Temps réel (Socket.io)')
@@ -755,7 +930,7 @@ async function main() {
   sFrancois.socket.on('annonce-created', () => { annonceRecueFrancois = true })
   sFrancois.socket.emit('join-annonces')
   await attendre(500)
-  const creee = await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, villeDepart: 'Test Diffusion' } })
+  const creee = await jean.requete('/api/annonces', { method: 'POST', json: { ...baseAnnonce, commentaire: 'Test diffusion' } })
   await attendre(900)
   verifier('un commissionnaire reçoit les nouvelles annonces en direct', annonceRecueFrancois)
   verifier('un transporteur ne reçoit pas le flux des annonces', !annonceRecue)

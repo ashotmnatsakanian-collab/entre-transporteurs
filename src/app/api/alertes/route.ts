@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { alerteSchema } from '@/lib/validations/divers'
 import { neutraliserJokers } from '@/lib/alertes'
-import { ApiError, exigerAccesCommissionnaire, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
+import { ApiError, communeOuErreur, exigerAccesCommissionnaire, exigerUtilisateur, gerer, json, limiter, lireJson } from '@/lib/api'
 
 const MAX_ALERTES = 10
 
@@ -20,8 +20,17 @@ export const POST = gerer(async (req) => {
   if ((await db.alerte.count({ where: { userId: u.id } })) >= MAX_ALERTES) {
     throw new ApiError(429, `Vous avez atteint la limite de ${MAX_ALERTES} alertes. Supprimez-en une pour en créer une nouvelle.`)
   }
+  const depart = data.inseeDepart ? await communeOuErreur(data.inseeDepart) : null
   const alerte = await db.alerte.create({
-    data: { ...data, userId: u.id, villeArrivee: data.villeArrivee ? neutraliserJokers(data.villeArrivee) || null : null },
+    data: {
+      userId: u.id,
+      villeDepart: depart?.nom ?? null,
+      latDepart: depart?.latitude ?? null,
+      lngDepart: depart?.longitude ?? null,
+      rayonKm: data.rayonKm,
+      villeArrivee: data.villeArrivee ? neutraliserJokers(data.villeArrivee) || null : null,
+      departements: [...new Set(data.departements)],
+    },
   })
   return json(alerte, { status: 201 })
 })
