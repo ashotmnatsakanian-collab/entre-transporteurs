@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { accueilPour } from '@/lib/routes'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { EDITEUR } from '@/lib/legal'
+import { filtreConforme } from '@/lib/documents'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -14,7 +15,7 @@ export default async function Home() {
 
   const valide = {
     active: true,
-    transporteur: { user: { suspendu: false, supprimeLe: null } },
+    transporteur: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() },
     OR: [
       { dateDisponibiliteFin: { gte: new Date() } },
       { AND: [{ dateDisponibiliteFin: null }, { dateDisponibilite: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }] },
@@ -30,7 +31,7 @@ export default async function Home() {
   })
 
   const [nbTransporteurs, nbAnnoncesActives, nbCommissionnaires] = await Promise.all([
-    db.transporteurProfil.count({ where: { user: { suspendu: false, supprimeLe: null } } }),
+    db.transporteurProfil.count({ where: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() } }),
     db.annonce.count({ where: valide }),
     db.commissionnaireProfil.count(),
   ])

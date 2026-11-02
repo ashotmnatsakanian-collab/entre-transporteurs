@@ -10,6 +10,7 @@ const LIENS_TRANSPORTEUR = [
   { href: '/transporteur/annonces', label: 'Mes disponibilités', icon: '📣' },
   { href: '/transporteur/besoins', label: 'Fret à prendre', icon: '📦' },
   { href: '/transporteur/flotte', label: 'Ma flotte', icon: '🚚' },
+  { href: '/transporteur/documents', label: 'Mes documents', icon: '📑' },
   { href: '/transporteur/profil', label: 'Mon profil', icon: '👤' },
   { href: '/messages', label: 'Messages', icon: '💬' },
 ]
@@ -27,6 +28,7 @@ const LIENS_COMMISSIONNAIRE = [
 const LIENS_ADMIN = [
   { href: '/admin', label: 'Tableau de bord', icon: '📊' },
   { href: '/admin/utilisateurs', label: 'Utilisateurs', icon: '👥' },
+  { href: '/admin/documents', label: 'Documents', icon: '📑' },
   { href: '/admin/signalements', label: 'Signalements', icon: '🚩' },
   { href: '/admin/journal', label: 'Journal de sécurité', icon: '🛡️' },
 ]

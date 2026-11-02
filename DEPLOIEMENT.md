@@ -45,6 +45,13 @@ dès l'ouverture publique, car l'offre gratuite s'endort après 15 minutes et co
 3. `EMAIL_FROM="Entre Transporteurs <no-reply@votre-domaine.fr>"`.
 4. Dès que `RESEND_API_KEY` est défini, **la confirmation d'adresse devient obligatoire** pour publier/contacter.
 
+## 4 bis. Documents légaux des transporteurs
+
+- `DOCUMENTS_CLE` : clé qui chiffre les fichiers (Render la génère). **Copiez-la dans votre gestionnaire de mots de passe** : sans elle, les documents sont perdus.
+- `EXIGER_DOCUMENTS=true` (déjà dans `render.yaml`) : un transporteur sans documents validés reste invisible. Mettre `false` pour un lancement sans cette exigence.
+- Chaque jour, le serveur supprime les documents périmés selon les durées de la politique de confidentialité et prévient par e-mail les transporteurs 30 jours avant l'expiration d'un document.
+- Votre travail : valider les dépôts dans `/admin/documents` (voir `JURIDIQUE.md`).
+
 ## 5. Premier administrateur
 
 Dans le *Shell* Render du service :
@@ -59,6 +66,7 @@ Si vous l'avez fait par erreur : `npm run demo:nettoyer -- --oui`.
 ## 6. Check-list avant d'ouvrir au public
 
 - [ ] Informations légales renseignées (sinon les pages affichent « [à compléter] »), CGU et confidentialité **relues par un juriste** — voir [JURIDIQUE.md](JURIDIQUE.md)
+- [ ] `DOCUMENTS_CLE` sauvegardée hors de Render, `EXIGER_DOCUMENTS` à `true`
 - [ ] `NEXT_PUBLIC_DEMO_MODE` **absent** (pas de connexion en un clic)
 - [ ] Aucune donnée de démonstration en base
 - [ ] Domaine en HTTPS, `NEXTAUTH_URL` identique, e-mail de test reçu (inscription → lien de confirmation)

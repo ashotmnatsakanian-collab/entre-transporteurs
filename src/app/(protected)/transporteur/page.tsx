@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { DisponibiliteToggle } from '@/components/carte/DisponibiliteToggle'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
+import { exigerDocuments } from '@/lib/documents'
+import { TYPES_OBLIGATOIRES, calculerConformite } from '@/lib/documents-regles'
 
 export default async function DashboardTransporteurPage() {
   const u = await exigerRoleOuRediriger('TRANSPORTEUR')
@@ -31,14 +33,20 @@ export default async function DashboardTransporteurPage() {
     : [0, null]
 
   const nbAnnoncesTotal = profil ? await db.annonce.count({ where: { transporteurId: profil.id } }) : 0
+  const documents = profil ? await db.documentTransporteur.findMany({ where: { transporteurId: profil.id }, select: { type: true, statut: true, dateExpiration: true } }) : []
+  const conforme = calculerConformite(documents) !== null
+  const nbDocsValides = documents.filter((d) => d.statut === 'VALIDE' && d.dateExpiration > new Date()).length
+  const documentsExiges = exigerDocuments()
   const profilComplet =
     !!profil && profil.siret.length === 14 && !(profil.latitude === 46.6034 && profil.longitude === 1.8883)
   const etapes = [
     { fait: profilComplet, label: 'Complétez votre profil (SIRET et ville de base)', href: '/transporteur/profil', action: 'Compléter' },
     { fait: (profil?.vehicules.length ?? 0) > 0, label: 'Ajoutez votre premier véhicule', href: '/transporteur/flotte/nouveau', action: 'Ajouter' },
+    ...(documentsExiges ? [{ fait: conforme, label: `Documents légaux validés : ${nbDocsValides}/${TYPES_OBLIGATOIRES.length} (Kbis, licence, vigilance…)`, href: '/transporteur/documents', action: 'Déposer' }] : []),
     { fait: nbAnnoncesTotal > 0, label: 'Publiez une disponibilité pour être trouvé', href: '/transporteur/annonces', action: 'Publier' },
   ]
   const onboardingTermine = etapes.every((e) => e.fait)
+  const nbEtapes = etapes.length
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
@@ -54,7 +62,7 @@ export default async function DashboardTransporteurPage() {
       {/* Premiers pas — disparaît une fois tout fait */}
       {!onboardingTermine && (
         <div className="bg-brand-50 border border-brand-100 rounded-xl p-5">
-          <h2 className="font-semibold text-slate-800 mb-1">👋 Bienvenue ! 3 étapes pour être trouvé par les commissionnaires</h2>
+          <h2 className="font-semibold text-slate-800 mb-1">👋 Bienvenue ! {nbEtapes} étapes pour être trouvé par les commissionnaires</h2>
           <p className="text-sm text-slate-500 mb-4">Gratuit, et ça prend moins de 5 minutes.</p>
           <ol className="space-y-2">
             {etapes.map((e, i) => (

@@ -11,7 +11,7 @@ npx prisma migrate deploy         # crée les tables
 npm run db:seed                   # données de démonstration (LOCAL uniquement)
 npm run dev                       # http://localhost:3000
 npm test                          # tests unitaires
-npm run verif:securite            # ~149 contrôles rejoués contre l'application (serveur lancé)
+npm run verif:securite            # ~209 contrôles rejoués contre l'application (serveur lancé)
 ```
 
 ---
@@ -37,6 +37,7 @@ npm run verif:securite            # ~149 contrôles rejoués contre l'applicatio
 
 ### Transporteur (toujours gratuit)
 - Inscription avec SIRET (badge **« SIRET vérifié »** si l'établissement est actif au répertoire officiel)
+- **Documents légaux** (Kbis, licence de transport, vigilance URSSAF, régularité fiscale, assurance) vérifiés par l'équipe : sans eux, pas de visibilité auprès des commissionnaires
 - Publication d'**annonces de disponibilité** (départ, arrivée éventuelle, dates, véhicule) et bascule disponible / indisponible
 - Gestion de la flotte : type, dimensions, charge utile, spécificités
 - Page **« Fret à prendre »** : besoins de transport publiés par des commissionnaires à proximité

@@ -42,7 +42,7 @@ export default function CguPage() {
           'Le service est réservé aux professionnels, majeurs et agissant pour les besoins de leur activité : aucun consommateur n\'est visé.',
           'L\'inscription est gratuite et suppose de fournir des informations exactes et à jour, une adresse e-mail valide (à confirmer) et, dans votre profil, le numéro SIRET de votre entreprise.',
           'Chaque compte est personnel et rattaché à une entreprise. Vous êtes responsable de la confidentialité de votre mot de passe et de toute activité réalisée depuis votre compte ; signalez immédiatement toute utilisation non autorisée.',
-          'Un Transporteur déclare disposer des autorisations nécessaires à son activité (inscription au registre des transporteurs, licence ou capacité, assurances). Un Commissionnaire déclare être régulièrement inscrit lorsque son activité l\'exige.',
+          'Un Transporteur déclare disposer des autorisations nécessaires à son activité (inscription au registre des transporteurs, licence ou capacité, assurances) et s\'engage à fournir, puis à maintenir à jour, les justificatifs prévus à l\'article 6 bis. Tant que ceux-ci ne sont pas validés, il n\'est pas visible des Commissionnaires et ne peut ni publier de disponibilité ni ouvrir de conversation. Un Commissionnaire déclare être régulièrement inscrit lorsque son activité l\'exige.',
         ]} />
       </Section>
 
@@ -75,6 +75,24 @@ export default function CguPage() {
           Seul un Commissionnaire ayant échangé avec un Transporteur (messages dans les deux sens) peut le noter. Les avis doivent refléter une expérience
           réelle, rester courtois et exempts de propos diffamatoires ou injurieux. L'Éditeur ne modifie pas le contenu d'un avis mais peut le supprimer
           s'il enfreint les présentes CGU ou la loi.
+        </p>
+      </Section>
+
+      <Section titre="6 bis. Documents légaux des Transporteurs">
+        <p>
+          Le Transporteur dépose dans « Mes documents » : un extrait Kbis (ou D1 / avis de situation), sa licence de transport (ou attestation d'inscription au registre),
+          une attestation de vigilance URSSAF, une attestation de régularité fiscale et une attestation d'assurance, en cours de validité. Il garantit leur authenticité,
+          leur exactitude et leur mise à jour : il les remplace avant leur échéance, faute de quoi il cesse d'être visible. Il autorise l'Éditeur à les contrôler,
+          y compris auprès de l'organisme émetteur (par exemple par le code de vérification de l'attestation de vigilance).
+        </p>
+        <p>
+          Ce contrôle est un contrôle de forme (document présent, lisible, cohérent avec le profil, en cours de validité). Il ne constitue ni une certification ni une garantie :
+          chaque Commissionnaire reste tenu de ses propres obligations de vérification à l'égard de ses sous-traitants (articles L. 8222-1 et suivants du Code du travail).
+          Le dépôt d'un document faux, falsifié ou appartenant à un tiers entraîne la suspension immédiate du compte, sans préjudice des poursuites éventuelles.
+        </p>
+        <p>
+          Les Commissionnaires voient uniquement le statut de chaque document et sa date de validité. Le Transporteur peut, s'il le souhaite, autoriser les Commissionnaires avec
+          lesquels il échange à télécharger ses documents validés ; chaque téléchargement est enregistré et l'autorisation peut être retirée à tout moment.
         </p>
       </Section>
 

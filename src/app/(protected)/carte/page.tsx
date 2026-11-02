@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { exigerRoleOuRediriger } from '@/lib/garde'
 import { CarteClient } from '@/components/carte/CarteClient'
+import { filtreConforme } from '@/lib/documents'
 
 export const metadata = { title: 'La carte — Entre Transporteurs' }
 
@@ -10,7 +11,7 @@ export default async function CartePage() {
 
   const [transporteurs, agregatsAvis] = await Promise.all([
     db.transporteurProfil.findMany({
-      where: { user: { suspendu: false, supprimeLe: null } },
+      where: { user: { suspendu: false, supprimeLe: null }, ...filtreConforme() },
       select: {
         id: true, userId: true, raisonSociale: true, description: true, latitude: true, longitude: true,
         disponible: true, zonesCirculation: true,

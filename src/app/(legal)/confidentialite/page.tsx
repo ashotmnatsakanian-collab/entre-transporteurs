@@ -22,6 +22,7 @@ export default function ConfidentialitePage() {
         <Liste elements={[
           <><strong>Compte</strong> : nom, adresse e-mail, téléphone (facultatif), mot de passe (conservé sous forme chiffrée irréversible, jamais en clair), rôle, date et version des conditions acceptées. Finalité : créer, sécuriser et gérer votre compte. Base légale : exécution du contrat.</>,
           <><strong>Profil professionnel</strong> : raison sociale, SIRET, description, ville de base (et ses coordonnées géographiques), zones, véhicules (type, dimensions, charge, immatriculation), disponibilités, besoins de transport, alertes. Finalité : mise en relation. Base légale : exécution du contrat. Le SIRET est vérifié auprès du répertoire officiel « Recherche d'entreprises » de l'État.</>,
+          <><strong>Documents légaux des transporteurs</strong> : fichiers fournis (extrait Kbis, licence de transport, attestations de vigilance URSSAF, de régularité fiscale et d'assurance), leurs dates de délivrance et de validité, le résultat de leur vérification. Ils peuvent comporter des données personnelles du dirigeant (par exemple pour un entrepreneur individuel) : ne transmettez que les documents demandés. Finalité : vérifier la régularité des transporteurs et sécuriser la mise en relation. Base légale : intérêt légitime et exécution du contrat.</>,
           <><strong>Messages et avis</strong> : contenu de vos échanges et notes. Finalité : fonctionnement de la messagerie et de la confiance entre utilisateurs. Base légale : exécution du contrat.</>,
           <><strong>E-mails de service et alertes</strong> : confirmation d'adresse, réinitialisation du mot de passe (base légale : contrat), alertes sur les annonces correspondant à vos critères (base légale : exécution du contrat ; désactivables à tout moment dans « Mon compte »).</>,
           <><strong>Données techniques de sécurité</strong> : adresse IP, date et résultat des connexions, signalements, actions d'administration. Finalité : sécurité du service, prévention de la fraude et des abus. Base légale : intérêt légitime.</>,
@@ -35,7 +36,8 @@ export default function ConfidentialitePage() {
 
       <Section titre="Qui voit quoi ?">
         <Liste elements={[
-          'Les Commissionnaires disposant d\'un accès actif voient les profils, disponibilités et la carte des Transporteurs, ainsi que leur numéro de téléphone s\'il est renseigné.',
+          'Les Commissionnaires disposant d\'un accès actif voient les profils, disponibilités et la carte des Transporteurs, ainsi que leur numéro de téléphone s\'il est renseigné, et le statut de leurs documents légaux (présent, validé, date de validité) — jamais les fichiers, sauf si le Transporteur a autorisé leur téléchargement par les Commissionnaires avec qui il échange.',
+          'Les documents légaux ne sont consultables que par vous et par les administrateurs chargés de leur vérification ; chaque téléchargement par un tiers est enregistré. Ils sont stockés chiffrés.',
           'Les Transporteurs voient les Besoins de transport publiés (raison sociale du Commissionnaire, trajet, date) mais pas les autres Transporteurs.',
           'Votre adresse e-mail n\'est jamais affichée aux autres utilisateurs. Les messages ne sont visibles que des deux participants à la conversation.',
           'Les visiteurs non connectés voient seulement un aperçu anonyme de quelques disponibilités (trajet, date, type de véhicule), sans nom ni coordonnées.',
@@ -82,6 +84,7 @@ export default function ConfidentialitePage() {
           'Journaux de sécurité (connexions, tentatives, actions d\'administration) : 12 mois, puis supprimés automatiquement.',
           'Liens de confirmation d\'e-mail et de réinitialisation : 24 heures et 1 heure au plus ; les jetons expirés sont purgés automatiquement.',
           'Données de facturation : 10 ans (obligation comptable), chez le prestataire de paiement.',
+          'Documents légaux : tant que le compte existe ; un document refusé est supprimé après 30 jours, un document expiré 6 mois après son échéance, et tous le sont à la suppression du compte.',
           'Messages : après la suppression d\'un compte, les messages échangés restent visibles de l\'interlocuteur sous le nom « Compte supprimé », sans lien avec votre identité, car il en a besoin comme preuve de ses échanges commerciaux.',
           'Sauvegardes : les copies techniques de l\'hébergeur peuvent contenir des données supprimées jusqu\'à leur rotation.',
         ]} />

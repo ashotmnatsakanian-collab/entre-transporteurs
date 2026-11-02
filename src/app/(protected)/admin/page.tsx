@@ -18,7 +18,7 @@ export default async function AdminPage() {
   const il24h = new Date(Date.now() - 86_400_000)
   const actif = { supprimeLe: null }
 
-  const [transporteurs, commissionnaires, nouveaux, verifies, suspendus, annonces, besoins, signalements, echecs] = await Promise.all([
+  const [transporteurs, commissionnaires, nouveaux, verifies, suspendus, annonces, besoins, signalements, echecs, documentsEnAttente] = await Promise.all([
     db.user.count({ where: { role: 'TRANSPORTEUR', ...actif } }),
     db.user.count({ where: { role: 'COMMISSIONNAIRE', ...actif } }),
     db.user.count({ where: { createdAt: { gte: il7j }, role: { not: 'ADMIN' } } }),
@@ -28,6 +28,7 @@ export default async function AdminPage() {
     db.besoin.count({ where: { active: true, dateEnlevement: { gte: new Date(Date.now() - 86_400_000) } } }),
     db.signalement.count({ where: { statut: 'OUVERT' } }),
     db.journalSecurite.count({ where: { type: 'connexion_echec', createdAt: { gte: il24h } } }),
+    db.documentTransporteur.count({ where: { statut: 'EN_ATTENTE' } }),
   ])
 
   return (
@@ -40,6 +41,7 @@ export default async function AdminPage() {
         <Carte label="SIRET vérifiés" valeur={verifies} />
         <Carte label="Annonces actives" valeur={annonces} />
         <Carte label="Besoins actifs" valeur={besoins} />
+        <Carte label="Documents à vérifier" valeur={documentsEnAttente} href="/admin/documents" alerte />
         <Carte label="Signalements ouverts" valeur={signalements} href="/admin/signalements" alerte />
         <Carte label="Échecs de connexion (24 h)" valeur={echecs} href="/admin/journal" alerte />
       </div>

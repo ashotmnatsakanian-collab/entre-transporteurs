@@ -20,6 +20,7 @@
 | **Badge « SIRET vérifié »** | uniquement après vérification officielle ; **non attribuable à la main** (l'admin peut seulement le retirer) |
 | **Facturation** | préavis de 30 jours respecté : accès gratuit jusqu'à `FACTURATION_A_PARTIR_DU`, bandeau d'annonce, puis 30 jours d'essai sans carte |
 | **Modération** | bouton « Signaler », suspension de comptes, journal d'audit |
+| **Documents des transporteurs** | page « Mes documents » : Kbis, licence de transport, vigilance URSSAF, régularité fiscale, assurance. Validation par vos soins dans `/admin/documents`. Sans les cinq validés, un transporteur est **invisible** des commissionnaires (recherche, carte, accueil) et ne peut ni publier, ni se déclarer disponible, ni ouvrir de conversation |
 
 ## 2. Ce que vous devez fournir (variables d'environnement Render)
 
@@ -53,6 +54,9 @@ Selon votre situation :
 - [ ] Stripe (au moment de faire payer) : renseigner l'URL des CGU, l'adresse de l'entreprise, activer le portail client et configurer des factures conformes (nom, adresse, SIRET, TVA)
 - [ ] Vérifier la disponibilité du nom « Entre Transporteurs » (INPI, base marques) et du nom de domaine ; envisager un dépôt de marque
 - [ ] Souscrire une assurance responsabilité civile professionnelle (recommandé)
+- [ ] **Vérifier les documents** : ouvrir `/admin/documents` régulièrement (une carte « Documents à vérifier » apparaît sur le tableau de bord admin). Contrôle de forme + code de vérification de l'attestation de vigilance sur urssaf.fr
+- [ ] **Sauvegarder `DOCUMENTS_CLE`** (clé qui chiffre les fichiers) dans un gestionnaire de mots de passe : si elle est perdue, les documents deviennent illisibles
+- [ ] Faire valider par votre juriste la liste des documents, les durées retenues (Kbis 3 mois, vigilance URSSAF 6 mois, régularité fiscale 6 mois : conventions de la plateforme) et la formulation de l'article 6 bis des CGU
 - [ ] Pas de déclaration CNIL à faire (supprimée depuis 2018) : **tenez en revanche le registre ci-dessous à jour**
 - [ ] Prévenir les commissionnaires **au moins 30 jours avant** de fixer `FACTURATION_A_PARTIR_DU` (annonce e-mail + bandeau automatique)
 
@@ -69,6 +73,7 @@ Selon votre situation :
 | 5 | Sécurité et audit | Prévention des abus, preuve | IP, dates et résultats de connexion, actions admin, signalements | utilisateurs, visiteurs | intérêt légitime | administrateurs | 12 mois |
 | 6 | Facturation (si activée) | Abonnements | identifiant client, statut, dates | commissionnaires | contrat, obligation légale | Stripe | 10 ans |
 | 7 | Vérification d'entreprise | Badge « SIRET vérifié » | numéro SIRET | utilisateurs | contrat | API publique de l'État | durée du compte |
+| 8 | Documents légaux des transporteurs | Vérifier la régularité, sécuriser la mise en relation | fichiers (Kbis, licence, attestations URSSAF / fiscale / assurance, pouvant contenir des données du dirigeant), dates, statut de vérification | transporteurs | intérêt légitime, contrat | administrateurs ; commissionnaires uniquement sur autorisation du transporteur et conversation ouverte | durée du compte ; refusés 30 jours ; expirés 6 mois après échéance |
 
 Sous-traitants : Render (hébergement, Francfort), Supabase (base de données, UE), Resend (e-mails), Stripe (paiement). Mesures de sécurité : voir `SECURITE.md`.
 
@@ -84,8 +89,21 @@ Sous-traitants : Render (hébergement, Francfort), Supabase (base de données, U
 
 **Modification des CGU ou de la confidentialité** — modifier le texte, puis changer `VERSION_CGU` et `MISE_A_JOUR_LEGALE` dans `src/lib/legal.ts` ; chaque utilisateur sera invité à accepter la nouvelle version. Toute hausse de prix : préavis de 30 jours.
 
+## 5 bis. Documents légaux : ce qui est collecté… et ce qui ne l'est pas
+
+Collectés : extrait Kbis (ou D1 / avis de situation), licence de transport (ou attestation d'inscription au registre), attestation de vigilance URSSAF, attestation de régularité fiscale, attestation d'assurance.
+Volontairement **non collectés** (données trop sensibles pour l'utilité apportée) : pièce d'identité du dirigeant, liste nominative des salariés étrangers, RIB, bulletins de salaire.
+
+Cadre : le commissionnaire qui confie du transport à un sous-traitant doit vérifier sa régularité (articles L. 8222-1 et suivants du Code du travail, notamment l'attestation de vigilance, à la signature puis tous les 6 mois). La plateforme **facilite** cette démarche mais ne la remplace pas : c'est écrit dans les CGU (article 6 bis) et rappelé sur chaque profil.
+
+**Qui voit quoi** : le transporteur ; les administrateurs (validation) ; les commissionnaires voient le statut et la date de validité, et ne peuvent télécharger un fichier que si le transporteur l'a autorisé **et** qu'une conversation existe entre eux (chaque téléchargement est journalisé).
+
+**Votre rôle de validateur** : vérifier que le document est du bon type, lisible, au nom de l'entreprise (raison sociale/SIRET du profil) et que les dates saisies sont exactes ; pour la vigilance URSSAF, contrôler le code sur urssaf.fr. Un faux document détecté : suspendre le compte (article 6 bis).
+
 ## 6. Limites à connaître
 
 - Aucune donnée n'est chiffrée de bout en bout : l'éditeur a techniquement accès à la base. La politique de confidentialité le dit.
 - La purge automatique s'exécute dans l'application (une instance) : si vous passez à plusieurs instances, planifiez-la une seule fois (tâche planifiée).
+- Aucun antivirus n'analyse les fichiers : seuls PDF, JPEG et PNG sont acceptés (type vérifié sur le contenu), les PDF contenant script ou pièce jointe sont refusés, et les fichiers ne sont jamais ouverts par le serveur ni affichés par le site (téléchargement seul). Ouvrez-les avec le lecteur de votre navigateur.
+- Les fichiers sont stockés dans la base de données (chiffrés). Au-delà de quelques centaines de transporteurs, prévoir un stockage d'objets privé (Supabase Storage, S3) : la base gratuite Supabase est limitée à 500 Mo.
 - Les comptes inactifs ne sont pas supprimés automatiquement : à décider (la CNIL suggère de définir une durée, par exemple 3 ans d'inactivité) puis à annoncer dans la politique de confidentialité.

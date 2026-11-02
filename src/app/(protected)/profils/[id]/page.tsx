@@ -9,6 +9,8 @@ import { ContactButton } from '@/components/ui/ContactButton'
 import { BoutonSignaler } from '@/components/ui/BoutonSignaler'
 import { SectionAvis } from '@/components/avis/SectionAvis'
 import { BadgeNote } from '@/components/avis/Etoiles'
+import { ResumeDocuments } from '@/components/documents/ResumeDocuments'
+import { calculerConformite } from '@/lib/documents-regles'
 
 export const metadata = { title: 'Profil transporteur — Entre Transporteurs' }
 
@@ -30,6 +32,16 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
   // Un transporteur ne consulte pas les profils de ses concurrents
   if (u.role === 'TRANSPORTEUR' && !estProprietaire) redirect('/transporteur')
   if (u.role === 'COMMISSIONNAIRE' && !(await aAccesPayant(u.id))) redirect('/abonnement/reactivation')
+
+  // Documents légaux : statut visible des commissionnaires ; fichiers téléchargeables si partage autorisé et conversation ouverte
+  let documents: Array<{ id: string; type: import('@prisma/client').TypeDocument; statut: import('@prisma/client').StatutDocument; dateExpiration: Date }> = []
+  let peutTelecharger = false
+  if (u.role === 'COMMISSIONNAIRE') {
+    documents = await db.documentTransporteur.findMany({ where: { transporteurId: profil.id }, select: { id: true, type: true, statut: true, dateExpiration: true } })
+    peutTelecharger =
+      profil.partageDocuments && !!(await db.conversation.findUnique({ where: { cle: paireCle(u.id, profil.user.id) }, select: { id: true } }))
+  }
+  const conforme = calculerConformite(documents) !== null
 
   const agregatAvis = await db.avis.aggregate({ where: { transporteurId: profil.id }, _avg: { note: true }, _count: true })
 
@@ -90,6 +102,8 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
           </div>
         )}
       </div>
+
+      {u.role === 'COMMISSIONNAIRE' && <ResumeDocuments documents={documents} conforme={conforme} peutTelecharger={peutTelecharger} />}
 
       {u.role === 'COMMISSIONNAIRE' && <SectionAvis transporteurId={profil.id} peutNoter={peutNoter} />}
 
