@@ -23,7 +23,7 @@ interface Transporteur {
   nb_avis?: number
   user: { id: string; nom: string; telephone: string | null }
   vehicules: Array<{ id: string; type: TypeVehicule; chargeUtile: number }>
-  distance_km?: number
+  distance_km?: number | null
 }
 
 interface Props {

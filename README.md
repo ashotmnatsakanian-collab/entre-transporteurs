@@ -40,12 +40,14 @@ npm run verif:securite            # ~236 contrôles rejoués contre l'applicatio
 - **Documents légaux** (Kbis, licence de transport, vigilance URSSAF, régularité fiscale, assurance) vérifiés par l'équipe : sans eux, pas de visibilité auprès des commissionnaires
 - Publication d'**annonces de disponibilité** (départ, arrivée éventuelle, dates, véhicule) et bascule disponible / indisponible
 - Gestion de la flotte : type, dimensions, charge utile, spécificités
+- **Position actuelle** (commune, jamais le GPS exact) en 2 clics depuis une barre fixe adaptée au téléphone, « disponible maintenant » qui expire seul (4 à 48 h) avec rappel e-mail et renouvellement en un clic, zone d'intervention (rayon, départements) et destination souhaitée
 - Page **« Fret à prendre »** : besoins de transport publiés par des commissionnaires à proximité
 - **Alertes e-mail** sur les besoins correspondant à son secteur
 
 ### Commissionnaire
-- **Recherche unifiée** : disponibilités en direct ou recherche détaillée par rayon, véhicule, charge, spécificités
-- **Carte interactive** des transporteurs disponibles, mise à jour en temps réel
+- **Recherche par zone** : autour d'une ville (rayon), par un ou plusieurs départements ou par région, avec filtres véhicule, date et « disponible maintenant » ; résultats triés par fraîcheur (« mis à jour il y a X min »)
+- **Carte par département** : nombre de transporteurs disponibles par zone, mis à jour en temps réel ; clic sur une zone = liste
+- **Alertes e-mail par zone** : « préviens-moi quand un transporteur devient disponible dans le 57 ou le 67 »
 - Publication de **besoins de transport** ; alertes e-mail quand un transporteur publie un trajet correspondant
 - Fiche transporteur, avis (après échange réel), signalement
 - **Documents légaux** (Kbis, vigilance URSSAF, régularité fiscale, assurance) à fournir et faire valider pour accéder à la recherche, à la carte et aux besoins

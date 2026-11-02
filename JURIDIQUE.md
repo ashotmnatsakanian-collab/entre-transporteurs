@@ -74,6 +74,7 @@ Selon votre situation :
 | 6 | Facturation (si activée) | Abonnements | identifiant client, statut, dates | commissionnaires | contrat, obligation légale | Stripe | 10 ans |
 | 7 | Vérification d'entreprise | Badge « SIRET vérifié » | numéro SIRET | utilisateurs | contrat | API publique de l'État | durée du compte |
 | 8 | Documents légaux | Vérifier la régularité, sécuriser la mise en relation | fichiers (Kbis, licence ou inscription au registre, attestations URSSAF / fiscale / assurance, pouvant contenir des données du dirigeant), dates, statut de vérification | transporteurs, commissionnaires | intérêt légitime, contrat | administrateurs ; l'autre partie d'une conversation uniquement sur autorisation du propriétaire | durée du compte ; refusés 30 jours ; expirés 6 mois après échéance |
+| 9 | Position et disponibilité | Trouver un transporteur disponible dans une zone | commune de position (centre de la commune, jamais le GPS exact), département, région, échéance de disponibilité, zone d'intervention, destination souhaitée | transporteurs | contrat | commissionnaires avec accès (commune tant que disponible) ; visiteurs (département seulement) | disponibilité : 24 h par défaut (4 à 48 h) ; position : effacée 30 jours après la dernière mise à jour |
 
 Sous-traitants : Render (hébergement, Francfort), Supabase (base de données, UE), Resend (e-mails), Stripe (paiement). Mesures de sécurité : voir `SECURITE.md`.
 
@@ -99,6 +100,14 @@ Cadre : le commissionnaire qui confie du transport à un sous-traitant doit vér
 **Qui voit quoi** : le propriétaire ; les administrateurs (validation) ; l'autre partie voit le statut et la date de validité, et ne peut télécharger un fichier que si le propriétaire l'a autorisé **et** qu'une conversation existe entre eux (chaque téléchargement est journalisé). Le panneau « Documents de … » s'affiche dans chaque conversation.
 
 **Votre rôle de validateur** : vérifier que le document est du bon type, lisible, au nom de l'entreprise (raison sociale/SIRET du profil) et que les dates saisies sont exactes ; pour la vigilance URSSAF, contrôler le code sur urssaf.fr. Un faux document détecté : suspendre le compte (article 6 bis).
+
+## 5 ter. Position et disponibilité : ce qui est enregistré
+
+- **Jamais le GPS exact.** Le navigateur trouve la commune (service public api-adresse.data.gouv.fr) ; nos serveurs ne reçoivent que son **code INSEE** et retrouvent eux-mêmes le centre de la commune, le département et la région (geo.api.gouv.fr). Une coordonnée envoyée par un client malveillant est ignorée.
+- **Visible par qui ?** Commissionnaires avec accès : la commune et la date de mise à jour, **uniquement tant que le transporteur est disponible** ; la carte ne montre que des compteurs par département. Visiteurs : le département des annonces, jamais la commune.
+- **Conservation** : « disponible maintenant » expire seul (24 h par défaut) ; la position est effacée 30 jours après la dernière mise à jour (tâche automatique, toutes les 5 minutes).
+- **Consentement** : la géolocalisation de l'appareil n'est utilisée que sur clic de l'utilisateur et après l'accord de son navigateur. La liste des 5 dernières villes est mémorisée **sur l'appareil uniquement** (stockage local) : indiquée dans la politique de confidentialité.
+- **VERSION_CGU** : la position est une nouvelle donnée personnelle, donc changement de version nécessaire ; elle est déjà passée au 2 novembre 2026 avec les documents légaux, donc rien de plus à faire avant le lancement (tous les comptes devront accepter cette version).
 
 ## 6. Limites à connaître
 

@@ -8,6 +8,8 @@ import { Navbar } from '@/components/ui/Navbar'
 import { Sidebar } from '@/components/ui/Sidebar'
 import { BanniereEssai } from '@/components/abonnement/BanniereEssai'
 import { BanniereEmail } from '@/components/ui/BanniereEmail'
+import { BarrePosition } from '@/components/position/BarrePosition'
+import { etatPosition } from '@/lib/position'
 import { BanniereFacturation } from '@/components/abonnement/BanniereFacturation'
 import { exigerDocuments, utilisateurEstConforme } from '@/lib/documents'
 import { facturationActive, facturationAnnoncee, finEssaiEffective, joursRestants } from '@/lib/facturation'
@@ -52,6 +54,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     }
   }
 
+  // Transporteur : position actuelle et disponibilité (barre fixe en bas de l'écran)
+  const profilTransporteur = user.role === 'TRANSPORTEUR' ? await db.transporteurProfil.findUnique({ where: { userId: user.id } }) : null
+  const etat = profilTransporteur ? etatPosition(profilTransporteur) : null
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar role={user.role} />
@@ -61,6 +67,19 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         {facturationLe && <BanniereFacturation date={facturationLe} />}
         {joursRestantsEssai !== null && <BanniereEssai joursRestants={joursRestantsEssai} />}
         <main className="flex-1 overflow-auto">{children}</main>
+        {etat && (
+          <BarrePosition
+            etat={{
+              positionVille: etat.positionVille,
+              positionInsee: etat.positionInsee,
+              positionDepartement: etat.positionDepartement,
+              disponible: etat.disponible,
+              disponibleJusqua: etat.disponibleJusqua?.toISOString() ?? null,
+              dureeHeures: etat.dureeHeures,
+              derniereMAJ: etat.derniereMAJ.toISOString(),
+            }}
+          />
+        )}
       </div>
     </div>
   )

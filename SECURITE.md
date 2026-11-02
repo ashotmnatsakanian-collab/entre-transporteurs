@@ -6,9 +6,9 @@ Il ne remplace pas un audit externe avant une montée en charge.
 ## Vérifier en 2 commandes
 
 ```bash
-npm test                    # 62 tests unitaires (SIRET, limitation de débit, IP, validations, facturation, durées de conservation…)
+npm test                    # 97 tests unitaires (SIRET, limitation de débit, IP, validations, facturation, durées de conservation…)
 npm run dev                 # dans un terminal…
-npm run verif:securite      # …puis dans un autre : ~236 contrôles rejoués contre l'application
+npm run verif:securite      # …puis dans un autre : ~307 contrôles rejoués contre l'application
 ```
 
 `verif:securite` joue le rôle d'un attaquant (visiteur anonyme, mauvais rôle, accès aux ressources d'autrui,
@@ -32,6 +32,7 @@ Il crée puis supprime ses propres comptes : ne le lancez jamais contre la base 
 | **Comptes** | Réinitialisation et vérification d'e-mail par jetons ; consentement CGU horodaté ; export RGPD ; suppression avec anonymisation ; signalement d'utilisateurs ; suspension par l'admin |
 | **Confiance** | Badge « SIRET vérifié » = établissement **existant et actif** au répertoire officiel de l'État (API `recherche-entreprises`), jamais une certification de licence de transport ; l'admin ne peut que le retirer, pas l'accorder |
 | **Documents légaux** | Dépôt limité à PDF/JPEG/PNG (type déterminé par les octets du fichier, pas par l'extension), 5 Mo, PDF avec script/pièce jointe refusés ; chiffrement AES-256-GCM au repos avec clé dédiée (`DOCUMENTS_CLE`), lié à l'identifiant du document ; contenu stocké dans une table séparée (jamais chargé par accident) ; téléchargement uniquement en pièce jointe avec `nosniff` et CSP `sandbox` ; accès : propriétaire, administrateur, ou l'autre partie (transporteur ↔ commissionnaire) autorisée par le propriétaire avec conversation ouverte (sinon 404) ; téléchargements par des tiers journalisés ; limitation de débit |
+| **Position** | Le navigateur n'envoie qu'un code INSEE : le serveur retrouve lui-même le centre de la commune, le département et la région auprès du service public (échec fermé si indisponible, une nouvelle tentative, IPv4 d'abord) ; les coordonnées et départements fournis par un client sont ignorés ; départements et régions validés par un référentiel officiel embarqué ; durées de disponibilité bornées (4/12/24/48 h) ; expiration contrôlée à chaque requête (une échéance dépassée est toujours ignorée) et par une tâche de fond ; carte réduite à des compteurs par département ; salon temps réel de la carte réservé aux commissionnaires autorisés ; renouvellement par jeton à usage unique, haché en base, confirmé par un bouton (pas par un simple clic sur le lien) ; limitation de débit |
 | **Juridique** | CGU versionnées (nouvelle acceptation à chaque changement), e-mails d'alerte désactivables — voir [JURIDIQUE.md](JURIDIQUE.md) |
 | **Audit** | Journal de sécurité en base (connexions, échecs, verrouillages, réinitialisations, actions admin, signalements, acceptations des CGU) consultable dans `/admin/journal` ; purgé automatiquement après 12 mois |
 | **Infra** | Validation de l'environnement au démarrage (le serveur **refuse** de démarrer en production avec un secret faible ou une URL non HTTPS), délais HTTP serrés, arrêt propre, erreurs sans stack ni détail interne |

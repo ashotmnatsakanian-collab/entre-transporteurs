@@ -1,12 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { TransporteurProfil } from '@prisma/client'
-import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
-
-const LAT_DEFAUT = 46.6034
-const LNG_DEFAUT = 1.8883
 
 interface Props {
   profil: TransporteurProfil | null
@@ -18,28 +14,10 @@ export function ProfilTransporteurForm({ profil }: Props) {
     siret: profil?.siret ?? '',
     raisonSociale: profil?.raisonSociale ?? '',
     description: profil?.description ?? '',
-    latitude: profil?.latitude ?? 46.6034,
-    longitude: profil?.longitude ?? 1.8883,
-    zonesCirculation: profil?.zonesCirculation ?? ([] as string[]),
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState<{ siretVerifie: boolean; avertissement: string | null } | null>(null)
   const [error, setError] = useState('')
-  // undefined = en cours de résolution ; null = position jamais renseignée
-  const [villeBase, setVilleBase] = useState<string | null | undefined>(undefined)
-
-  useEffect(() => {
-    const positionRenseignee = profil && !(profil.latitude === LAT_DEFAUT && profil.longitude === LNG_DEFAUT)
-    if (!profil || !positionRenseignee) {
-      setVilleBase(null)
-      return
-    }
-    // Géocodage inverse : retrouve le nom de la commune pour l'afficher à la place des coordonnées
-    fetch(`https://api-adresse.data.gouv.fr/reverse/?lon=${profil.longitude}&lat=${profil.latitude}`)
-      .then((r) => r.json())
-      .then((d) => setVilleBase(d.features?.[0]?.properties?.city ?? null))
-      .catch(() => setVilleBase(null))
-  }, [profil])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -50,12 +28,7 @@ export function ProfilTransporteurForm({ profil }: Props) {
     const res = await fetch('/api/transporteurs', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...form,
-        latitude: Number(form.latitude),
-        longitude: Number(form.longitude),
-        siret: form.siret.replace(/\s/g, ''),
-      }),
+      body: JSON.stringify({ ...form, siret: form.siret.replace(/\s/g, '') }),
     })
 
     const data = await res.json().catch(() => ({}))
@@ -104,21 +77,9 @@ export function ProfilTransporteurForm({ profil }: Props) {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Ville de base *</label>
-        {villeBase !== undefined && (
-          <VilleAutocomplete
-            placeholder="Tapez votre ville (ex: Lyon)"
-            valeurInitiale={villeBase ?? ''}
-            onSelect={(v) => setForm((p) => ({ ...p, latitude: v.lat, longitude: v.lng }))}
-          />
-        )}
-        <p className="text-xs text-slate-400 mt-1">
-          {villeBase
-            ? 'Cette position détermine où vous apparaissez sur la carte et dans les recherches.'
-            : 'Position non renseignée : vous apparaissez actuellement au centre de la France. Choisissez votre ville.'}
-        </p>
-      </div>
+      <p className="text-sm text-slate-700">
+        Votre position et votre disponibilité se règlent depuis la barre « Où êtes-vous maintenant ? » en bas de l'écran, et votre zone d'intervention juste en dessous.
+      </p>
 
       {error && <p className="text-red-600 text-sm" role="alert">{error}</p>}
       {success && (

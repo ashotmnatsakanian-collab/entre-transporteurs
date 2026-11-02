@@ -19,7 +19,7 @@ export default function CguPage() {
         <Liste elements={[
           <><strong>Transporteur</strong> : professionnel du transport routier de marchandises qui propose ses véhicules.</>,
           <><strong>Commissionnaire</strong> : commissionnaire de transport, affréteur ou entreprise qui cherche un transporteur.</>,
-          <><strong>Disponibilité</strong> : annonce par laquelle un Transporteur signale un véhicule libre (lieu, dates, véhicule).</>,
+          <><strong>Disponibilité</strong> : annonce datée par laquelle un Transporteur signale un véhicule libre (lieu, dates, véhicule), ou statut « disponible maintenant » associé à sa position actuelle, qui expire automatiquement.</>,
           <><strong>Besoin de transport</strong> : annonce par laquelle un Commissionnaire signale un fret à transporter.</>,
           <><strong>Contenu</strong> : toute information publiée sur la Plateforme (profil, flotte, disponibilités, besoins, messages, avis).</>,
         ]} />
@@ -48,8 +48,9 @@ export default function CguPage() {
 
       <Section titre="4. Description du service">
         <Liste elements={[
-          'Transporteurs : création d\'un profil et d\'une flotte, publication de Disponibilités, consultation des Besoins de transport proches, alertes e-mail, messagerie.',
-          'Commissionnaires : recherche de Transporteurs (liste et carte), publication de Besoins de transport, alertes e-mail, messagerie, avis.',
+          'Transporteurs : création d\'un profil et d\'une flotte, indication de leur position actuelle (commune) et de leur zone d\'intervention, publication de Disponibilités, consultation des Besoins de transport proches, alertes e-mail, messagerie.',
+          'Commissionnaires : recherche de Transporteurs disponibles par rayon, départements ou région (liste et carte par département), publication de Besoins de transport, alertes e-mail par zone, messagerie, avis.',
+          'Le statut « disponible maintenant » s\'éteint automatiquement à l\'échéance choisie par le Transporteur (24 heures par défaut) ; le Transporteur s\'engage à n\'indiquer que sa position réelle et à garder ses informations à jour. Une fausse position répétée peut entraîner la suspension du compte.',
           'La messagerie ne permet d\'échanger qu\'entre un Transporteur et un Commissionnaire.',
           'Les fonctionnalités peuvent évoluer. L\'Éditeur s\'efforce d\'assurer la disponibilité du service sans pouvoir la garantir de façon continue.',
         ]} />

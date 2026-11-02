@@ -23,6 +23,7 @@ export default function ConfidentialitePage() {
           <><strong>Compte</strong> : nom, adresse e-mail, téléphone (facultatif), mot de passe (conservé sous forme chiffrée irréversible, jamais en clair), rôle, date et version des conditions acceptées. Finalité : créer, sécuriser et gérer votre compte. Base légale : exécution du contrat.</>,
           <><strong>Profil professionnel</strong> : raison sociale, SIRET, description, ville de base (et ses coordonnées géographiques), zones, véhicules (type, dimensions, charge, immatriculation), disponibilités, besoins de transport, alertes. Finalité : mise en relation. Base légale : exécution du contrat. Le SIRET est vérifié auprès du répertoire officiel « Recherche d'entreprises » de l'État.</>,
           <><strong>Documents légaux</strong> : fichiers fournis par les transporteurs et les commissionnaires (extrait Kbis, licence de transport ou inscription au registre des commissionnaires, attestations de vigilance URSSAF, de régularité fiscale et d'assurance), leurs dates de délivrance et de validité, le résultat de leur vérification. Ils peuvent comporter des données personnelles du dirigeant (par exemple pour un entrepreneur individuel) : ne transmettez que les documents demandés. Finalité : vérifier la régularité des transporteurs et sécuriser la mise en relation. Base légale : intérêt légitime et exécution du contrat.</>,
+          <><strong>Position et disponibilité (transporteurs)</strong> : commune où vous vous trouvez (jamais vos coordonnées GPS exactes), son département et sa région, l'heure de la dernière mise à jour, l'échéance de votre disponibilité, votre zone d'intervention (rayon, départements) et votre destination souhaitée. Finalité : permettre aux commissionnaires de trouver un transporteur disponible dans une zone. Base légale : exécution du contrat. La géolocalisation de votre appareil n'est utilisée que si vous cliquez sur « Utiliser ma position » et acceptez la demande de votre navigateur : vos coordonnées exactes servent alors uniquement à trouver votre commune (interrogation de l'API publique api-adresse.data.gouv.fr par votre navigateur), et seul le code de la commune est transmis à nos serveurs.</>,
           <><strong>Messages et avis</strong> : contenu de vos échanges et notes. Finalité : fonctionnement de la messagerie et de la confiance entre utilisateurs. Base légale : exécution du contrat.</>,
           <><strong>E-mails de service et alertes</strong> : confirmation d'adresse, réinitialisation du mot de passe (base légale : contrat), alertes sur les annonces correspondant à vos critères (base légale : exécution du contrat ; désactivables à tout moment dans « Mon compte »).</>,
           <><strong>Données techniques de sécurité</strong> : adresse IP, date et résultat des connexions, signalements, actions d'administration. Finalité : sécurité du service, prévention de la fraude et des abus. Base légale : intérêt légitime.</>,
@@ -36,11 +37,11 @@ export default function ConfidentialitePage() {
 
       <Section titre="Qui voit quoi ?">
         <Liste elements={[
-          'Les Commissionnaires disposant d\'un accès actif voient les profils, disponibilités et la carte des Transporteurs, ainsi que leur numéro de téléphone s\'il est renseigné, et le statut de leurs documents légaux (présent, validé, date de validité) — jamais les fichiers, sauf si le Transporteur a autorisé leur téléchargement par les Commissionnaires avec qui il échange. Réciproquement, les Transporteurs voient le statut des documents des Commissionnaires avec qui ils échangent, et peuvent télécharger leurs fichiers si ceux-ci l\'ont autorisé.',
+          'Les Commissionnaires disposant d\'un accès actif voient les profils et disponibilités des Transporteurs, leur numéro de téléphone s\'il est renseigné, leur commune et la date de mise à jour de leur position tant qu\'ils sont disponibles maintenant (jamais un lieu périmé), et la carte par département (compteurs, sans position individuelle), et le statut de leurs documents légaux (présent, validé, date de validité) — jamais les fichiers, sauf si le Transporteur a autorisé leur téléchargement par les Commissionnaires avec qui il échange. Réciproquement, les Transporteurs voient le statut des documents des Commissionnaires avec qui ils échangent, et peuvent télécharger leurs fichiers si ceux-ci l\'ont autorisé.',
           'Les documents légaux ne sont consultables que par vous et par les administrateurs chargés de leur vérification ; chaque téléchargement par un tiers est enregistré. Ils sont stockés chiffrés.',
           'Les Transporteurs voient les Besoins de transport publiés (raison sociale du Commissionnaire, trajet, date) mais pas les autres Transporteurs.',
           'Votre adresse e-mail n\'est jamais affichée aux autres utilisateurs. Les messages ne sont visibles que des deux participants à la conversation.',
-          'Les visiteurs non connectés voient seulement un aperçu anonyme de quelques disponibilités (trajet, date, type de véhicule), sans nom ni coordonnées.',
+          'Les visiteurs non connectés voient seulement un aperçu anonyme de quelques disponibilités (départements de départ et d\'arrivée, date, type de véhicule), sans nom, sans commune ni coordonnées.',
           'Les administrateurs de la plateforme consultent les comptes et les signalements pour modérer le service ; l\'espace d\'administration ne donne pas accès au contenu de vos messages.',
         ]} />
         <p>
@@ -55,7 +56,7 @@ export default function ConfidentialitePage() {
           'Envoi des e-mails (confirmation, réinitialisation, alertes) : Resend.',
           'Paiement (lorsqu\'il est activé) : Stripe, qui agit pour les données de paiement en qualité de responsable de traitement indépendant.',
           'Vérification du SIRET : seul le numéro SIRET est transmis, depuis nos serveurs, à l\'API publique de l\'État.',
-          'Recherche de communes : lorsque vous saisissez une ville, votre navigateur interroge directement api-adresse.data.gouv.fr (service public).',
+          'Recherche de communes : lorsque vous saisissez une ville, votre navigateur interroge directement api-adresse.data.gouv.fr (service public). Nos serveurs interrogent geo.api.gouv.fr (service public) avec le seul code de la commune pour en retrouver le centre, le département et la région.',
           'Cartographie : votre navigateur télécharge directement les tuiles OpenStreetMap ; votre adresse IP leur est donc visible.',
         ]} />
         <p>
@@ -74,13 +75,14 @@ export default function ConfidentialitePage() {
           <><strong>cookie de page de retour</strong> (<code>callback-url</code>) : mémorise la page à afficher après la connexion, durée de la session de navigation.</>,
         ]} />
         <p>
-          Aucun cookie de mesure d'audience, de publicité ou de réseau social n'est déposé, et aucune donnée n'est stockée dans votre navigateur au-delà de ces cookies : aucun bandeau de consentement n'est donc requis.
+          Aucun cookie de mesure d'audience, de publicité ou de réseau social n'est déposé. Seule exception, sur votre appareil uniquement : la liste de vos 5 dernières villes est mémorisée dans le stockage local de votre navigateur pour accélérer la mise à jour de votre position (elle n'est jamais envoyée à nos serveurs et s'efface en vidant les données du site). À part cela, aucune donnée n'est stockée dans votre navigateur au-delà des cookies ci-dessus : aucun bandeau de consentement n'est donc requis.
         </p>
       </Section>
 
       <Section titre="Durées de conservation">
         <Liste elements={[
           'Compte, profil et contenus : tant que le compte existe ; effacés ou anonymisés à sa suppression.',
+          'Disponibilité « maintenant » : expire automatiquement (24 heures par défaut, 4 à 48 heures au choix). Position : effacée automatiquement 30 jours après sa dernière mise à jour si vous n\'êtes pas disponible ; supprimée avec le compte.',
           'Journaux de sécurité (connexions, tentatives, actions d\'administration) : 12 mois, puis supprimés automatiquement.',
           'Liens de confirmation d\'e-mail et de réinitialisation : 24 heures et 1 heure au plus ; les jetons expirés sont purgés automatiquement.',
           'Données de facturation : 10 ans (obligation comptable), chez le prestataire de paiement.',

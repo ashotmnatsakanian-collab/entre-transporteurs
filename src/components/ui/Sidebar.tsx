@@ -53,6 +53,7 @@ export function Sidebar({ role }: { role: Role }) {
             <Link
               key={l.href}
               href={l.href}
+              aria-label={l.label}
               className={clsx(
                 'flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm transition-colors',
                 actif

@@ -4,23 +4,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { io } from 'socket.io-client'
+import { TypeVehicule } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, type AnnonceRecherche } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
+import { SelecteurZone } from '@/components/recherche/SelecteurZone'
 import { PanneauAlertes } from './PanneauAlertes'
+import { ZONE_PAR_DEFAUT, annonceDansZone, distanceKm, zoneComplete, zonePourQuery, type Zone } from '@/lib/zone'
+import { ilYA } from '@/lib/fraicheur'
+import { libelleDepartement } from '@/lib/referentiel-geo'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr', { day: 'numeric', month: 'short' })
-}
-
-// Même formule que côté serveur (src/lib/geo.ts) — calcul client pour les
-// annonces reçues en direct par Socket.io, avant tout aller-retour réseau.
-function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const rad = Math.PI / 180
-  const d = 6371 * Math.acos(
-    Math.min(1, Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad) + Math.sin(lat1 * rad) * Math.sin(lat2 * rad))
-  )
-  return Math.round(d * 10) / 10
 }
 
 function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean }) {
@@ -59,24 +54,25 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
             {a.disponible && (
               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">🟢 Disponible maintenant</span>
             )}
-            <span className="text-xs text-slate-400">📍 {a.distance_km} km</span>
             <BadgeNote moyenne={a.note_moyenne} total={a.nb_avis} />
           </div>
           <div className="text-sm text-slate-700 mt-1 font-medium">
-            {a.villeDepart} → {a.villeArrivee || 'Toutes directions'}
+            {a.villeDepart}{a.departementDepart ? ` (${libelleDepartement(a.departementDepart)})` : ''} → {a.villeArrivee || 'Toutes directions'}
           </div>
           <div className="text-xs text-slate-500 mt-0.5">
             Dispo du {formatDate(a.dateDisponibilite)}
             {a.dateDisponibiliteFin && ` au ${formatDate(a.dateDisponibiliteFin)}`}
             {a.vehiculeType && ` · ${TYPE_VEHICULE_LABELS[a.vehiculeType]}`}
             {a.vehiculeChargeUtile && ` · ${a.vehiculeChargeUtile.toLocaleString('fr')} kg`}
+            {a.distance_km !== null && ` · à ${a.distance_km} km`}
+            {` · publiée ${ilYA(a.createdAt)}`}
           </div>
           {a.commentaire && <p className="text-xs text-slate-500 mt-1 italic">"{a.commentaire}"</p>}
         </div>
         <button onClick={() => contacter(a.userId)} disabled={loading}
-          className="text-sm bg-brand-600 text-white px-3 py-2 sm:py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors shrink-0 w-full sm:w-auto"
+          className="min-h-[44px] text-sm font-medium bg-brand-600 text-white px-4 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors shrink-0 w-full sm:w-auto cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         >
-          {loading ? '…' : `💬 Contacter ${a.nom.split(' ')[0]}`}
+          {loading ? '…' : `Contacter ${a.nom.split(' ')[0]}`}
         </button>
       </div>
     </div>
@@ -84,18 +80,11 @@ function CarteAnnonce({ a, nouvelle }: { a: AnnonceRecherche; nouvelle?: boolean
 }
 
 export function RechercheAnnoncesClient() {
-  const [filtres, setFiltres] = useState({
-    lat: 48.8566,
-    lng: 2.3522,
-    rayonKm: 150,
-    date: '',
-    villeArrivee: '',
-  })
-  const [villeChoisie, setVilleChoisie] = useState(true)
-  const [villeNom, setVilleNom] = useState('Paris')
+  const [zone, setZone] = useState<Zone>({ ...ZONE_PAR_DEFAUT, rayonKm: 150, lat: 48.8566, lng: 2.3522, villeNom: 'Paris' })
+  const [filtres, setFiltres] = useState({ date: '', villeArrivee: '', typeVehicule: '' as TypeVehicule | '', disponibleMaintenant: false })
   const [filtresOuverts, setFiltresOuverts] = useState(false)
-  const filtresRef = useRef(filtres)
-  useEffect(() => { filtresRef.current = filtres }, [filtres])
+  const reference = useRef({ zone, filtres })
+  useEffect(() => { reference.current = { zone, filtres } }, [zone, filtres])
 
   const [resultats, setResultats] = useState<AnnonceRecherche[]>([])
   const [nouvellesIds, setNouvellesIds] = useState<Set<string>>(new Set())
@@ -104,35 +93,35 @@ export function RechercheAnnoncesClient() {
   const [erreur, setErreur] = useState('')
 
   const rechercher = useCallback(async () => {
+    const { zone: z, filtres: f } = reference.current
+    if (!zoneComplete(z)) return
     setLoading(true)
     setErreur('')
 
     const params = new URLSearchParams({
-      lat: String(filtres.lat),
-      lng: String(filtres.lng),
-      rayonKm: String(filtres.rayonKm),
-      ...(filtres.date && { date: filtres.date }),
-      ...(filtres.villeArrivee && { villeArrivee: filtres.villeArrivee }),
+      ...zonePourQuery(z),
+      ...(f.date && { date: f.date }),
+      ...(f.villeArrivee && { villeArrivee: f.villeArrivee }),
+      ...(f.typeVehicule && { typeVehicule: f.typeVehicule }),
+      ...(f.disponibleMaintenant && { disponibleMaintenant: '1' }),
     })
 
     const res = await fetch(`/api/annonces?${params}`)
     if (res.ok) {
       setResultats(await res.json())
     } else {
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       setErreur(data.error ?? 'Erreur lors de la recherche')
     }
     setRechercheFaite(true)
     setLoading(false)
     setFiltresOuverts(false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtres.lat, filtres.lng, filtres.rayonKm, filtres.date, filtres.villeArrivee])
+  }, [])
 
   // Chargement automatique au montage — c'est un tableau d'affichage, pas une recherche à froid
   useEffect(() => {
     rechercher()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [rechercher])
 
   // Tableau vivant : une nouvelle annonce publiée pendant qu'on regarde apparaît
   // aussitôt si elle correspond aux critères actuels, sans recharger la page.
@@ -140,11 +129,12 @@ export function RechercheAnnoncesClient() {
     const socket = io({ path: '/api/socket' })
     socket.emit('join-annonces')
 
-    socket.on('annonce-created', (a: Omit<AnnonceRecherche, 'distance_km'> & { latDepart: number; lngDepart: number }) => {
-      const f = filtresRef.current
-      const distance = distanceKm(f.lat, f.lng, a.latDepart, a.lngDepart)
-      if (distance > f.rayonKm) return
+    socket.on('annonce-created', (a: Omit<AnnonceRecherche, 'distance_km'>) => {
+      const { zone: z, filtres: f } = reference.current
+      if (!annonceDansZone(a, z)) return
       if (f.villeArrivee && a.villeArrivee && !a.villeArrivee.toLowerCase().includes(f.villeArrivee.toLowerCase())) return
+      if (f.typeVehicule && a.vehiculeType !== f.typeVehicule) return
+      if (f.disponibleMaintenant && !a.disponible) return
       if (f.date) {
         const date = new Date(f.date)
         const debut = new Date(a.dateDisponibilite)
@@ -152,6 +142,7 @@ export function RechercheAnnoncesClient() {
         if (date < debut || date > fin) return
       }
 
+      const distance = z.mode === 'ville' && z.lat !== undefined && z.lng !== undefined ? distanceKm(z.lat, z.lng, a.latDepart, a.lngDepart) : null
       setResultats((prev) => [{ ...a, distance_km: distance }, ...prev.filter((r) => r.id !== a.id)])
       setNouvellesIds((prev) => new Set(prev).add(a.id))
       setTimeout(() => {
@@ -174,66 +165,61 @@ export function RechercheAnnoncesClient() {
           onClick={() => setFiltresOuverts((o) => !o)}
           className="md:hidden w-full flex items-center justify-between text-sm font-medium text-slate-700"
         >
-          <span>🔎 Modifier la recherche</span>
-          <span className="text-slate-400">{filtresOuverts ? '▲' : '▼'}</span>
+          <span>Modifier la recherche</span>
+          <span className="text-slate-600">{filtresOuverts ? '▲' : '▼'}</span>
         </button>
         <form onSubmit={(e) => { e.preventDefault(); rechercher() }} className={`space-y-4 mt-4 md:mt-0 ${filtresOuverts ? 'block' : 'hidden'} md:block`}>
-          <h2 className="font-semibold text-slate-800">Où et quand ?</h2>
+          <h2 className="font-semibold text-slate-900">Où et quand ?</h2>
 
-          <VilleAutocomplete
-            label="Autour de la ville de"
-            placeholder="Tapez une ville"
-            valeurInitiale="Paris"
-            onSelect={(v) => { setVilleChoisie(true); setVilleNom(v.nom); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
-            onClear={() => setVilleChoisie(false)}
-          />
+          <SelecteurZone zone={zone} onChange={setZone} villeInitiale="Paris" />
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Rayon (km)</label>
-            <div className="flex items-center gap-2">
-              <input type="range" min={10} max={500} step={10} value={filtres.rayonKm}
-                onChange={(e) => setFiltres((p) => ({ ...p, rayonKm: Number(e.target.value) }))}
-                className="flex-1"
-              />
-              <span className="text-sm font-medium text-slate-700 w-14 text-right">{filtres.rayonKm} km</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Disponible à la date du (optionnel)</label>
-            <input type="date" value={filtres.date}
+            <label htmlFor="filtre-date" className="block text-sm font-medium text-slate-700 mb-1">Disponible à la date du (facultatif)</label>
+            <input id="filtre-date" type="date" value={filtres.date}
               onChange={(e) => setFiltres((p) => ({ ...p, date: e.target.value }))}
-              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full min-h-[44px] border border-slate-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
 
+          <div>
+            <label htmlFor="filtre-vehicule" className="block text-sm font-medium text-slate-700 mb-1">Type de véhicule</label>
+            <select id="filtre-vehicule" value={filtres.typeVehicule}
+              onChange={(e) => setFiltres((p) => ({ ...p, typeVehicule: e.target.value as TypeVehicule | '' }))}
+              className="w-full min-h-[44px] border border-slate-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              <option value="">Tous les types</option>
+              {Object.values(TypeVehicule).map((t) => <option key={t} value={t}>{TYPE_VEHICULE_LABELS[t]}</option>)}
+            </select>
+          </div>
+
           <VilleAutocomplete
-            label="Destination souhaitée (optionnel)"
-            placeholder="Ex: Marseille"
+            label="Destination souhaitée (facultatif)"
+            placeholder="Ex : Marseille"
             onSelect={(v) => setFiltres((p) => ({ ...p, villeArrivee: v.nom }))}
             onClear={() => setFiltres((p) => ({ ...p, villeArrivee: '' }))}
           />
 
-          <button type="submit" disabled={loading || !villeChoisie}
-            className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
+          <label className="flex items-center gap-3 min-h-[44px] text-sm text-slate-800 cursor-pointer">
+            <input type="checkbox" checked={filtres.disponibleMaintenant}
+              onChange={(e) => setFiltres((p) => ({ ...p, disponibleMaintenant: e.target.checked }))} className="h-5 w-5" />
+            Disponible maintenant uniquement
+          </label>
+
+          <button type="submit" disabled={loading || !zoneComplete(zone)}
+            className="w-full min-h-[44px] bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            {loading ? 'Recherche…' : '🔍 Rechercher'}
+            {loading ? 'Recherche…' : 'Rechercher'}
           </button>
         </form>
-        <PanneauAlertes
-          criteres={{ villeDepart: villeNom, latDepart: filtres.lat, lngDepart: filtres.lng, rayonKm: filtres.rayonKm, villeArrivee: filtres.villeArrivee || null }}
-          actif={villeChoisie}
-          visible={filtresOuverts}
-        />
+        <PanneauAlertes zone={zone} villeArrivee={filtres.villeArrivee || null} actif={zoneComplete(zone)} visible={filtresOuverts} />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {erreur && <p className="text-red-600 text-sm text-center pt-4">{erreur}</p>}
         {loading && resultats.length === 0 && !erreur && (
-          <p className="text-slate-400 text-sm text-center pt-16">Chargement des disponibilités…</p>
+          <p className="text-slate-700 text-sm text-center pt-16">Chargement des disponibilités…</p>
         )}
         {!loading && rechercheFaite && resultats.length === 0 && !erreur && (
-          <p className="text-slate-400 text-sm text-center pt-16">Aucune disponibilité pour ces critères. Élargissez le rayon ou la date.</p>
+          <p className="text-slate-700 text-sm text-center pt-16">Aucune disponibilité pour ces critères. Élargissez la zone ou la date, ou créez une alerte pour être prévenu.</p>
         )}
         {resultats.map((a) => (
           <CarteAnnonce key={a.id} a={a} nouvelle={nouvellesIds.has(a.id)} />

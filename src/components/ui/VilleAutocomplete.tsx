@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 export interface Ville {
   nom: string
   lat: number
   lng: number
+  /** Code INSEE de la commune : seul identifiant envoyé au serveur (qui retrouve lui-même le centre, le département, la région) */
+  insee: string
   departement?: string
 }
 
@@ -26,13 +28,14 @@ interface Props {
 // API officielle des communes françaises (data.gouv.fr) — gratuite, sans clé, CORS ouvert.
 const ENDPOINT = 'https://api-adresse.data.gouv.fr/search/'
 
-export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurInitiale = '', required, className, onSelect, onClear }: Props) {
+export function VilleAutocomplete({ label, placeholder = 'Ville ou code postal', valeurInitiale = '', required, className, onSelect, onClear }: Props) {
   const [query, setQuery] = useState(valeurInitiale)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [ouvert, setOuvert] = useState(false)
   const [choisie, setChoisie] = useState(!!valeurInitiale)
   const [indexActif, setIndexActif] = useState(-1)
   const conteneurRef = useRef<HTMLDivElement>(null)
+  const idChamp = useId()
 
   useEffect(() => {
     if (choisie || query.trim().length < 2) {
@@ -47,7 +50,7 @@ export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurIniti
         const data = await res.json() as {
           features: Array<{
             geometry: { coordinates: [number, number] }
-            properties: { name: string; postcode?: string; context?: string; id: string }
+            properties: { name: string; postcode?: string; context?: string; id: string; citycode?: string }
           }>
         }
         setSuggestions(
@@ -57,6 +60,7 @@ export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurIniti
             .slice(0, 6)
             .map((f) => ({
               cle: f.properties.id,
+              insee: f.properties.citycode ?? f.properties.id,
               nom: f.properties.name,
               lng: f.geometry.coordinates[0],
               lat: f.geometry.coordinates[1],
@@ -88,7 +92,7 @@ export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurIniti
     setChoisie(true)
     setOuvert(false)
     setSuggestions([])
-    onSelect({ nom: s.nom, lat: s.lat, lng: s.lng, departement: s.departement })
+    onSelect({ nom: s.nom, lat: s.lat, lng: s.lng, insee: s.insee, departement: s.departement })
   }
 
   function surSaisie(valeur: string) {
@@ -117,8 +121,9 @@ export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurIniti
 
   return (
     <div ref={conteneurRef} className={`relative ${className ?? ''}`}>
-      {label && <label className="block text-xs text-slate-500 mb-1">{label}</label>}
+      {label && <label htmlFor={idChamp} className="block text-sm font-medium text-slate-700 mb-1">{label}</label>}
       <input
+        id={idChamp}
         type="text"
         value={query}
         required={required}
@@ -127,7 +132,7 @@ export function VilleAutocomplete({ label, placeholder = 'Ex: Lyon', valeurIniti
         onChange={(e) => surSaisie(e.target.value)}
         onKeyDown={surTouche}
         onFocus={() => suggestions.length > 0 && setOuvert(true)}
-        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        className="w-full min-h-[44px] border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
       {choisie && <span className="absolute right-3 top-[34px] text-green-600 text-sm pointer-events-none">✓</span>}
       {ouvert && suggestions.length > 0 && (

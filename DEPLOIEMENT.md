@@ -75,6 +75,7 @@ Si vous l'avez fait par erreur : `npm run demo:nettoyer -- --oui`.
 - [ ] Plan Render **Starter** (pas d'endormissement)
 - [ ] Sauvegardes : activer les sauvegardes Supabase (offre Pro) ou planifier un `pg_dump` hebdomadaire
 - [ ] Supervision : un moniteur gratuit (UptimeRobot) sur `/api/sante`
+- [ ] Tâches de fond (expiration des disponibilités et rappels toutes les 5 min, purge des positions de plus de 30 jours, purge du journal et des jetons) : automatiques dans l'application — avec **plusieurs instances**, les planifier une seule fois à part
 - [ ] Purge des données expirées (journal > 12 mois, jetons) : automatique chaque jour dans l'application — avec **plusieurs instances**, la planifier une seule fois à part
 - [ ] `npm run verif:securite` passé **sur un environnement de test** (jamais sur la production)
 

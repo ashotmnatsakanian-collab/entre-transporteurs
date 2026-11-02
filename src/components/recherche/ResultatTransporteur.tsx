@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import type { TypeVehicule, Specificite } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, SPECIFICITE_LABELS } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
+import { IconeLieu } from '@/components/position/Icones'
+import { ilYA, jusquA } from '@/lib/fraicheur'
+import { libelleLieu } from '@/lib/referentiel-geo'
 
 interface Props {
   transporteur: {
@@ -13,8 +16,15 @@ interface Props {
     userId: string
     raisonSociale: string
     description: string | null
-    disponible: boolean
-    distance_km: number
+    positionVille: string | null
+    positionDepartement: string | null
+    zonesCirculation: string[]
+    rayonInterventionKm: number | null
+    destinationVille: string | null
+    disponibleJusqua: string | null
+    derniereMAJ: string
+    distance_km: number | null
+    via_intervention: boolean
     verifie: boolean
     note_moyenne: number | null
     nb_avis: number
@@ -43,25 +53,40 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <Link href={`/profils/${t.id}`} className="font-semibold text-slate-800 hover:text-brand-700 hover:underline">
+            <Link href={`/profils/${t.id}`} className="font-semibold text-slate-900 hover:text-brand-700 hover:underline">
               {t.raisonSociale}
             </Link>
             {t.verifie && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700" title="Établissement existant et en activité au répertoire officiel">✅ SIRET vérifié</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800" title="Établissement existant et en activité au répertoire officiel">SIRET vérifié</span>
             )}
-            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.disponible ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-              {t.disponible ? '🟢 Disponible maintenant' : 'Pas disponible maintenant'}
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-900">
+              Disponible {t.disponibleJusqua ? jusquA(t.disponibleJusqua) : 'maintenant'}
             </span>
-            <span className="text-xs text-slate-400">📍 {t.distance_km} km</span>
             <BadgeNote moyenne={t.note_moyenne} total={t.nb_avis} />
           </div>
-          {t.description && <p className="text-xs text-slate-500 mt-1 line-clamp-1">{t.description}</p>}
+
+          <p className="mt-1 text-sm text-slate-800 flex items-center gap-1.5 flex-wrap">
+            <IconeLieu className="w-4 h-4 text-slate-600 shrink-0" />
+            <span className="font-medium">{t.positionVille ? libelleLieu(t.positionVille, t.positionDepartement) : 'Position non précisée'}</span>
+            {t.distance_km !== null && <span className="text-slate-600">· à {t.distance_km} km</span>}
+            <span className="text-slate-600">· mis à jour {ilYA(t.derniereMAJ)}</span>
+          </p>
+
+          {t.via_intervention && (
+            <p className="mt-1 text-xs text-slate-700">
+              Accepte de se déplacer
+              {t.rayonInterventionKm ? ` jusqu'à ${t.rayonInterventionKm} km` : ''}
+              {t.zonesCirculation.length > 0 ? `${t.rayonInterventionKm ? ' et dans les départements' : ' dans les départements'} ${t.zonesCirculation.join(', ')}` : ''}.
+            </p>
+          )}
+          {t.destinationVille && <p className="mt-1 text-xs text-slate-700">Destination souhaitée : {t.destinationVille}</p>}
+          {t.description && <p className="text-xs text-slate-600 mt-1 line-clamp-1">{t.description}</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           <button onClick={contacter} disabled={contactLoading}
-            className="text-sm bg-brand-600 text-white px-3 py-2 sm:py-1.5 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors w-full sm:w-auto"
+            className="min-h-[44px] text-sm font-medium bg-brand-600 text-white px-4 rounded-lg hover:bg-brand-700 disabled:opacity-50 transition-colors w-full sm:w-auto cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            {contactLoading ? '…' : '💬 Contacter'}
+            {contactLoading ? '…' : 'Contacter'}
           </button>
         </div>
       </div>
@@ -70,19 +95,19 @@ export function ResultatTransporteur({ transporteur: t }: Props) {
       {t.vehicules.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {t.vehicules.map((v) => (
-            <div key={v.id} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs">
+            <div key={v.id} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800">
               <span className="font-medium">{TYPE_VEHICULE_LABELS[v.type]}</span>
-              <span className="text-slate-400 ml-1">· {v.chargeUtile.toLocaleString('fr')} kg</span>
+              <span className="text-slate-600 ml-1">· {v.chargeUtile.toLocaleString('fr')} kg</span>
               {v.specificites.slice(0, 2).map((s) => (
-                <span key={s} className="ml-1 text-brand-600">· {SPECIFICITE_LABELS[s]}</span>
+                <span key={s} className="ml-1 text-brand-700">· {SPECIFICITE_LABELS[s]}</span>
               ))}
             </div>
           ))}
         </div>
       )}
 
-      <div className="mt-2 text-xs text-slate-400">
-        <Link href={`/profils/${t.id}`} className="hover:text-brand-600">Voir le profil complet →</Link>
+      <div className="mt-2 text-xs">
+        <Link href={`/profils/${t.id}`} className="text-slate-700 hover:text-brand-700 underline">Voir le profil complet</Link>
       </div>
     </div>
   )

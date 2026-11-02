@@ -11,6 +11,9 @@ import { SectionAvis } from '@/components/avis/SectionAvis'
 import { BadgeNote } from '@/components/avis/Etoiles'
 import { ResumeDocuments } from '@/components/documents/ResumeDocuments'
 import { calculerConformite } from '@/lib/documents-regles'
+import { disponibleMaintenant } from '@/lib/disponibilite'
+import { ilYA, jusquA } from '@/lib/fraicheur'
+import { libelleLieu } from '@/lib/referentiel-geo'
 
 export const metadata = { title: 'Profil transporteur — Entre Transporteurs' }
 
@@ -29,6 +32,7 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
   if (!profil) notFound()
 
   const estProprietaire = profil.user.id === u.id
+  const dispoMaintenant = disponibleMaintenant(profil)
   // Un transporteur ne consulte pas les profils de ses concurrents
   if (u.role === 'TRANSPORTEUR' && !estProprietaire) redirect('/transporteur')
   if (u.role === 'COMMISSIONNAIRE' && !(await aAccesPayant(u.id))) redirect('/abonnement/reactivation')
@@ -64,11 +68,18 @@ export default async function ProfilPublicPage({ params }: { params: Promise<{ i
             {profil.user.verifie && (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700" title="Établissement existant et en activité au répertoire officiel">✅ SIRET vérifié</span>
             )}
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${profil.disponible ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-              {profil.disponible ? 'Disponible maintenant' : 'Pas disponible maintenant'}
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${dispoMaintenant ? 'bg-green-100 text-green-900' : 'bg-slate-100 text-slate-700'}`}>
+              {dispoMaintenant ? `Disponible ${jusquA(profil.disponibleJusqua!)}` : 'Pas disponible maintenant'}
             </span>
           </div>
           <div className="mt-1"><BadgeNote moyenne={agregatAvis._avg.note} total={agregatAvis._count} /></div>
+          {/* La position (commune) n'est montrée que pendant la disponibilité : jamais un lieu périmé */}
+          {dispoMaintenant && profil.positionVille && (
+            <p className="text-sm text-slate-800 mt-1">
+              Position : <strong>{libelleLieu(profil.positionVille, profil.positionDepartement)}</strong> · mis à jour {ilYA(profil.derniereMAJ)}
+              {profil.destinationVille ? ` · destination souhaitée : ${profil.destinationVille}` : ''}
+            </p>
+          )}
           <p className="text-slate-500 text-sm mt-1">
             SIRET {profil.siret || 'non renseigné'}
             {profil.activiteOfficielle && ` · activité ${profil.activiteOfficielle}`}

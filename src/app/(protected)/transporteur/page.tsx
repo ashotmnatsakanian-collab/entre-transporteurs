@@ -1,7 +1,8 @@
 import { db } from '@/lib/db'
 import { exigerRoleOuRediriger } from '@/lib/garde'
 import Link from 'next/link'
-import { DisponibiliteToggle } from '@/components/carte/DisponibiliteToggle'
+import { CarteDisponibilite } from '@/components/position/CarteDisponibilite'
+import { etatPosition } from '@/lib/position'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { BadgeNote } from '@/components/avis/Etoiles'
 import { exigerDocuments } from '@/lib/documents'
@@ -37,10 +38,11 @@ export default async function DashboardTransporteurPage() {
   const conforme = calculerConformite(documents, 'TRANSPORTEUR') !== null
   const nbDocsValides = documents.filter((d) => d.statut === 'VALIDE' && d.dateExpiration > new Date()).length
   const documentsExiges = exigerDocuments()
-  const profilComplet =
-    !!profil && profil.siret.length === 14 && !(profil.latitude === 46.6034 && profil.longitude === 1.8883)
+  const profilComplet = !!profil && profil.siret.length === 14
+  const positionRenseignee = !!profil?.positionInsee
   const etapes = [
-    { fait: profilComplet, label: 'Complétez votre profil (SIRET et ville de base)', href: '/transporteur/profil', action: 'Compléter' },
+    { fait: profilComplet, label: 'Complétez votre profil (SIRET et raison sociale)', href: '/transporteur/profil', action: 'Compléter' },
+    { fait: positionRenseignee, label: 'Indiquez où vous êtes (barre en bas de l’écran)', href: '/transporteur', action: 'Indiquer' },
     { fait: (profil?.vehicules.length ?? 0) > 0, label: 'Ajoutez votre premier véhicule', href: '/transporteur/flotte/nouveau', action: 'Ajouter' },
     ...(documentsExiges ? [{ fait: conforme, label: `Documents légaux validés : ${nbDocsValides}/${OBLIGATOIRES_PAR_ROLE.TRANSPORTEUR.length} (Kbis, licence, vigilance…)`, href: '/transporteur/documents', action: 'Déposer' }] : []),
     { fait: nbAnnoncesTotal > 0, label: 'Publiez une disponibilité pour être trouvé', href: '/transporteur/annonces', action: 'Publier' },
@@ -56,8 +58,19 @@ export default async function DashboardTransporteurPage() {
           <h1 className="text-2xl font-bold text-slate-800">Mon tableau de bord</h1>
           <p className="text-slate-500">{profil?.raisonSociale}</p>
         </div>
-        <DisponibiliteToggle disponible={profil?.disponible ?? false} />
       </div>
+
+      {profil && (() => {
+        const e = etatPosition(profil)
+        return (
+          <CarteDisponibilite
+            etat={{
+              positionVille: e.positionVille, positionInsee: e.positionInsee, positionDepartement: e.positionDepartement,
+              disponible: e.disponible, disponibleJusqua: e.disponibleJusqua?.toISOString() ?? null, dureeHeures: e.dureeHeures, derniereMAJ: e.derniereMAJ.toISOString(),
+            }}
+          />
+        )
+      })()}
 
       {/* Premiers pas — disparaît une fois tout fait */}
       {!onboardingTermine && (
@@ -140,7 +153,7 @@ export default async function DashboardTransporteurPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <QuickLink href="/transporteur/annonces" emoji="📣" label="Mes disponibilités" desc="Publiez vos trajets retour" />
         <QuickLink href="/transporteur/besoins" emoji="📦" label="Fret à prendre" desc="Commissionnaires près de chez vous" />
-        <QuickLink href="/transporteur/profil" emoji="👤" label="Mon profil" desc="SIRET et ville de base" />
+        <QuickLink href="/transporteur/profil" emoji="👤" label="Mon profil" desc="SIRET et zone d'intervention" />
         <QuickLink href="/messages" emoji="💬" label="Messagerie" desc="Vos conversations en cours" />
       </div>
     </div>

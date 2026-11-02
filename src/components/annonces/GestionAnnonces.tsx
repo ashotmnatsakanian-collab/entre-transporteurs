@@ -36,10 +36,8 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
 
   const [form, setForm] = useState({
     vehiculeId: '',
-    villeDepart: '',
-    latDepart: null as number | null,
-    lngDepart: null as number | null,
-    villeArrivee: '',
+    inseeDepart: '',
+    inseeArrivee: '',
     dateDisponibilite: new Date().toISOString().slice(0, 10),
     dateDisponibiliteFin: '',
     commentaire: '',
@@ -49,7 +47,7 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
     e.preventDefault()
     setErreur('')
 
-    if (form.latDepart === null || form.lngDepart === null) {
+    if (!form.inseeDepart) {
       setErreur('Choisissez la ville de départ dans la liste de suggestions.')
       return
     }
@@ -61,10 +59,9 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         vehiculeId: form.vehiculeId || null,
-        villeDepart: form.villeDepart,
-        latDepart: form.latDepart,
-        lngDepart: form.lngDepart,
-        villeArrivee: form.villeArrivee || null,
+        // Seul le code de la commune est envoyé : le serveur retrouve lui-même son nom, son centre et son département
+        inseeDepart: form.inseeDepart,
+        inseeArrivee: form.inseeArrivee || null,
         dateDisponibilite: form.dateDisponibilite,
         dateDisponibiliteFin: form.dateDisponibiliteFin || null,
         commentaire: form.commentaire || null,
@@ -75,7 +72,7 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
       const nouvelle = await res.json()
       setAnnonces((prev) => [nouvelle, ...prev])
       setFormOuvert(false)
-      setForm((p) => ({ ...p, villeDepart: '', villeArrivee: '', commentaire: '' }))
+      setForm((p) => ({ ...p, inseeDepart: '', inseeArrivee: '', commentaire: '' }))
       router.refresh()
     } else {
       const data = await res.json()
@@ -117,8 +114,8 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
               label="Ville de départ"
               placeholder="Tapez une ville (ex: Lyon)"
               required
-              onSelect={(v) => setForm((p) => ({ ...p, villeDepart: v.nom, latDepart: v.lat, lngDepart: v.lng }))}
-              onClear={() => setForm((p) => ({ ...p, villeDepart: '', latDepart: null, lngDepart: null }))}
+              onSelect={(v) => setForm((p) => ({ ...p, inseeDepart: v.insee }))}
+              onClear={() => setForm((p) => ({ ...p, inseeDepart: '' }))}
             />
             <div>
               <label className="block text-xs text-slate-500 mb-1">Véhicule concerné</label>
@@ -139,8 +136,8 @@ export function GestionAnnonces({ annoncesInitiales, vehicules }: Props) {
           <VilleAutocomplete
             label="Destination souhaitée (optionnel — vide = toutes directions)"
             placeholder="Tapez une ville (ex: Marseille)"
-            onSelect={(v) => setForm((p) => ({ ...p, villeArrivee: v.nom }))}
-            onClear={() => setForm((p) => ({ ...p, villeArrivee: '' }))}
+            onSelect={(v) => setForm((p) => ({ ...p, inseeArrivee: v.insee }))}
+            onClear={() => setForm((p) => ({ ...p, inseeArrivee: '' }))}
           />
 
           <div className="grid grid-cols-2 gap-4">

@@ -7,6 +7,7 @@ import { accueilPour } from '@/lib/routes'
 import { TYPE_VEHICULE_LABELS } from '@/types'
 import { EDITEUR } from '@/lib/legal'
 import { filtreConforme } from '@/lib/documents'
+import { libelleDepartement } from '@/lib/referentiel-geo'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
@@ -22,12 +23,12 @@ export default async function Home() {
     ],
   }
 
-  // Aperçu public : ni nom d'entreprise ni contact — seulement le trajet, la date et le véhicule
+  // Aperçu public : ni nom d'entreprise ni contact ni commune — seulement le DÉPARTEMENT, la date et le véhicule
   const apercu = await db.annonce.findMany({
     where: valide,
     orderBy: { createdAt: 'desc' },
     take: 6,
-    select: { id: true, villeDepart: true, villeArrivee: true, dateDisponibilite: true, vehicule: { select: { type: true, chargeUtile: true } } },
+    select: { id: true, departementDepart: true, departementArrivee: true, dateDisponibilite: true, vehicule: { select: { type: true, chargeUtile: true } } },
   })
 
   const [nbTransporteurs, nbAnnoncesActives, nbCommissionnaires] = await Promise.all([
@@ -108,7 +109,7 @@ export default async function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {apercu.map((a) => (
               <div key={a.id} className="border border-slate-200 rounded-xl p-4 bg-white">
-                <div className="font-medium text-slate-800">📍 {a.villeDepart} → {a.villeArrivee ?? 'Toutes directions'}</div>
+                <div className="font-medium text-slate-800">📍 {a.departementDepart ? libelleDepartement(a.departementDepart) : 'France'} → {a.departementArrivee ? libelleDepartement(a.departementArrivee) : 'Toutes directions'}</div>
                 <div className="text-xs text-slate-500 mt-1">
                   Dès le {a.dateDisponibilite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
                   {a.vehicule && ` · ${TYPE_VEHICULE_LABELS[a.vehicule.type]} · ${a.vehicule.chargeUtile.toLocaleString('fr-FR')} kg`}

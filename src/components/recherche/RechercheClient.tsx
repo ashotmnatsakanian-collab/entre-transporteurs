@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { TypeVehicule, Specificite } from '@prisma/client'
 import { TYPE_VEHICULE_LABELS, SPECIFICITE_LABELS } from '@/types'
 import { ResultatTransporteur } from './ResultatTransporteur'
-import { VilleAutocomplete } from '@/components/ui/VilleAutocomplete'
+import { SelecteurZone } from './SelecteurZone'
+import { ZONE_PAR_DEFAUT, zoneComplete, zonePourApi, type Zone } from '@/lib/zone'
 
 const CarteInteractive = dynamic(() => import('@/components/carte/CarteInteractive'), { ssr: false })
 
@@ -16,9 +17,15 @@ interface ResultatRecherche {
   description: string | null
   latitude: number
   longitude: number
-  disponible: boolean
+  positionVille: string | null
+  positionDepartement: string | null
   zonesCirculation: string[]
-  distance_km: number
+  rayonInterventionKm: number | null
+  destinationVille: string | null
+  disponibleJusqua: string | null
+  derniereMAJ: string
+  distance_km: number | null
+  via_intervention: boolean
   verifie: boolean
   note_moyenne: number | null
   nb_avis: number
@@ -28,17 +35,14 @@ interface ResultatRecherche {
 }
 
 export default function RechercheClient() {
+  const [zone, setZone] = useState<Zone>({ ...ZONE_PAR_DEFAUT, lat: 48.8566, lng: 2.3522, villeNom: 'Paris' })
   const [filtres, setFiltres] = useState({
-    lat: 48.8566,
-    lng: 2.3522,
-    rayonKm: 100,
     typeVehicule: '' as TypeVehicule | '',
     chargeUtileMin: '',
     longueurMin: '',
     specificites: [] as Specificite[],
-    disponibleSeulement: false,
   })
-  const [villeChoisie, setVilleChoisie] = useState(true)
+  const [erreur, setErreur] = useState('')
   const [filtresOuverts, setFiltresOuverts] = useState(true)
   const [resultats, setResultats] = useState<ResultatRecherche[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,23 +61,22 @@ export default function RechercheClient() {
   async function rechercher(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setErreur('')
 
     const res = await fetch('/api/recherche', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        lat: Number(filtres.lat),
-        lng: Number(filtres.lng),
-        rayonKm: Number(filtres.rayonKm),
+        ...zonePourApi(zone),
         typeVehicule: filtres.typeVehicule || undefined,
         chargeUtileMin: filtres.chargeUtileMin ? Number(filtres.chargeUtileMin) : undefined,
         longueurMin: filtres.longueurMin ? Number(filtres.longueurMin) : undefined,
         specificites: filtres.specificites,
-        disponibleSeulement: filtres.disponibleSeulement,
       }),
     })
 
-    const data = await res.json()
+    const data = await res.json().catch(() => null)
+    if (!res.ok) setErreur(data?.error ?? 'Erreur lors de la recherche')
     setResultats(Array.isArray(data) ? data : [])
     setRechercheFaite(true)
     setLoading(false)
@@ -95,24 +98,7 @@ export default function RechercheClient() {
         <form onSubmit={rechercher} className={`space-y-4 mt-4 md:mt-0 ${filtresOuverts ? 'block' : 'hidden'} md:block`}>
           <h2 className="font-semibold text-slate-800">Filtres</h2>
 
-          <VilleAutocomplete
-            label="Autour de la ville de"
-            placeholder="Tapez une ville"
-            valeurInitiale="Paris"
-            onSelect={(v) => { setVilleChoisie(true); setFiltres((p) => ({ ...p, lat: v.lat, lng: v.lng })) }}
-            onClear={() => setVilleChoisie(false)}
-          />
-
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Rayon (km)</label>
-            <div className="flex items-center gap-2">
-              <input type="range" min={10} max={500} step={10} value={filtres.rayonKm}
-                onChange={(e) => setFiltres((p) => ({ ...p, rayonKm: Number(e.target.value) }))}
-                className="flex-1"
-              />
-              <span className="text-sm font-medium text-slate-700 w-14 text-right">{filtres.rayonKm} km</span>
-            </div>
-          </div>
+          <SelecteurZone zone={zone} onChange={setZone} villeInitiale="Paris" />
 
           <div>
             <label className="block text-xs text-slate-500 mb-1">Type de véhicule</label>
@@ -163,15 +149,9 @@ export default function RechercheClient() {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={filtres.disponibleSeulement}
-              onChange={(e) => setFiltres((p) => ({ ...p, disponibleSeulement: e.target.checked }))}
-              className="rounded"
-            />
-            Disponibles uniquement
-          </label>
+          <p className="text-xs text-slate-700">Seuls les transporteurs disponibles maintenant sont affichés, les plus récemment mis à jour en premier.</p>
 
-          <button type="submit" disabled={loading || !villeChoisie}
+          <button type="submit" disabled={loading || !zoneComplete(zone)}
             className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-medium hover:bg-brand-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Recherche…' : '🔍 Rechercher'}
@@ -197,10 +177,11 @@ export default function RechercheClient() {
         {vue === 'liste' ? (
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {!rechercheFaite && (
-              <p className="text-slate-400 text-sm text-center pt-16">Renseignez vos critères et lancez une recherche.</p>
+              <p className="text-slate-700 text-sm text-center pt-16">Choisissez une zone et lancez une recherche.</p>
             )}
-            {rechercheFaite && resultats.length === 0 && (
-              <p className="text-slate-400 text-sm text-center pt-16">Aucun résultat pour ces critères. Élargissez le rayon ou modifiez les filtres.</p>
+            {erreur && <p className="text-red-800 text-sm text-center pt-4" role="alert">{erreur}</p>}
+            {rechercheFaite && !erreur && resultats.length === 0 && (
+              <p className="text-slate-700 text-sm text-center pt-16">Aucun transporteur disponible dans cette zone pour le moment. Élargissez la zone, ou créez une alerte pour être prévenu.</p>
             )}
             {resultats.map((t) => (
               <ResultatTransporteur key={t.id} transporteur={t} />
@@ -211,6 +192,7 @@ export default function RechercheClient() {
             <CarteInteractive
               transporteurs={resultats.map((t) => ({
                 ...t,
+                disponible: true,
                 user: { id: t.userId, nom: t.nom, telephone: t.telephone },
               }))}
               height="100%"
