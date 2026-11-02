@@ -31,6 +31,11 @@ export function verifierEnvironnement(): void {
     // Sans date, tous les essais seraient déjà expirés au premier jour : les CGU promettent un préavis de 30 jours
     problemes.push("FACTURATION_A_PARTIR_DU est requis quand Stripe est configuré (ex. 2027-01-15, au moins 30 jours après l'annonce aux utilisateurs)")
   }
+  // Les documents légaux sont exigés en production par défaut ; ils y sont chiffrés avec une clé dédiée
+  const exigeDocuments = process.env.EXIGER_DOCUMENTS?.trim().toLowerCase() !== 'false' && (estProduction || process.env.EXIGER_DOCUMENTS?.trim().toLowerCase() === 'true')
+  if (exigeDocuments && estProduction && (process.env.DOCUMENTS_CLE ?? '').length < 32) {
+    problemes.push('DOCUMENTS_CLE (32 caractères minimum) est requis pour chiffrer les documents légaux (ou EXIGER_DOCUMENTS=false)')
+  }
   if (process.env.FACTURATION_A_PARTIR_DU && Number.isNaN(new Date(process.env.FACTURATION_A_PARTIR_DU).getTime())) {
     problemes.push('FACTURATION_A_PARTIR_DU doit être une date valide (AAAA-MM-JJ)')
   }

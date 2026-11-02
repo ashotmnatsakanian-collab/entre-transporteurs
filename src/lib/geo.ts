@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { db } from './db'
+import { clauseConforme } from './documents'
 
 export interface RowTransporteurGeo {
   id: string
@@ -64,7 +65,9 @@ export async function rechercherParRayon(
       FROM "Avis" GROUP BY "transporteurId"
     ) av ON av."transporteurId" = tp.id
     WHERE
-      6371 * acos(
+      NOT u.suspendu AND u."supprimeLe" IS NULL
+      ${clauseConforme('tp')}
+      AND 6371 * acos(
         LEAST(1.0,
           cos(radians(${lat})) * cos(radians(tp.latitude))
           * cos(radians(tp.longitude) - radians(${lng}))
@@ -199,6 +202,8 @@ export async function rechercherAnnoncesParRayon(params: {
     ) av ON av."transporteurId" = tp.id
     WHERE
       a.active = true
+      AND NOT u.suspendu AND u."supprimeLe" IS NULL
+      ${clauseConforme('tp')}
       ${clauseDate}
       ${clauseArrivee}
       AND 6371 * acos(

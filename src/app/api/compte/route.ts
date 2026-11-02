@@ -19,7 +19,8 @@ export const GET = gerer(async (req) => {
     select: {
       id: true, email: true, nom: true, telephone: true, role: true, verifie: true, createdAt: true,
       emailVerifieLe: true, cguAccepteesLe: true, cguVersion: true, alertesEmail: true,
-      transporteurProfil: { include: { vehicules: true, annonces: true, avis: true } },
+      // Documents : métadonnées uniquement (les fichiers se retrouvent dans « Mes documents »)
+      transporteurProfil: { include: { vehicules: true, annonces: true, avis: true, documents: { select: { type: true, statut: true, nomFichier: true, mime: true, taille: true, dateEmission: true, dateExpiration: true, motifRefus: true, verifieLe: true, createdAt: true } } } },
       commissionnaireProfil: { include: { besoins: true } },
       abonnement: { select: { statut: true, dateFinEssai: true, dateFinPeriode: true, createdAt: true } },
       avisDonnes: true,

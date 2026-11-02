@@ -6,6 +6,7 @@ import { authOptions } from './auth'
 import { db } from './db'
 import { emailActif } from './email'
 import { aAccesPayant } from './acces'
+import { transporteurEstConforme } from './documents'
 import { VERSION_CGU } from './legal'
 import { consommer } from './rate-limit'
 import { ipClient } from './ip'
@@ -99,6 +100,20 @@ export async function lireJson<T>(req: NextRequest, schema: z.ZodType<T, z.ZodTy
   return resultat.data
 }
 
+/** Formulaire multipart (envoi de fichier) : taille annoncée obligatoire et plafonnée avant toute lecture. */
+export async function lireFormulaire(req: NextRequest, maxOctets: number): Promise<FormData> {
+  const type = (req.headers.get('content-type') ?? '').toLowerCase()
+  if (!type.startsWith('multipart/form-data')) throw new ApiError(415, 'Content-Type multipart/form-data requis')
+  const taille = Number(req.headers.get('content-length'))
+  if (!Number.isFinite(taille) || taille <= 0) throw new ApiError(411, 'Taille de la requête requise')
+  if (taille > maxOctets) throw new ApiError(413, 'Fichier trop volumineux')
+  try {
+    return await req.formData()
+  } catch {
+    throw new ApiError(400, 'Formulaire invalide')
+  }
+}
+
 /** Paramètres d'URL validés (chaînes vides ignorées ; les schémas utilisent z.coerce). */
 export function lireQuery<T>(req: NextRequest, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T {
   const brut: Record<string, string> = {}
@@ -164,6 +179,13 @@ export async function exigerAccesCommissionnaire(): Promise<Utilisateur> {
   const u = await exigerUtilisateur('COMMISSIONNAIRE')
   if (!(await aAccesPayant(u.id))) throw new ApiError(402, 'Abonnement requis', { code: 'ABONNEMENT_REQUIS' })
   return u
+}
+
+/** Publier, se déclarer disponible ou ouvrir une conversation exige des documents validés (quand ils sont exigés). */
+export async function exigerTransporteurConforme(userId: string): Promise<void> {
+  if (!(await transporteurEstConforme(userId))) {
+    throw new ApiError(403, 'Vos documents légaux doivent être validés avant cette action. Rendez-vous dans « Mes documents ».', { code: 'DOCUMENTS_REQUIS' })
+  }
 }
 
 /** Actions publiques (annonce, message, avis) : l'adresse e-mail doit être confirmée. */

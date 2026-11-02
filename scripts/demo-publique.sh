@@ -45,4 +45,4 @@ echo ""
 
 # Secret éphémère propre à cette démo (les sessions ne survivent pas à un redémarrage)
 NEXTAUTH_SECRET="${NEXTAUTH_SECRET_DEMO:-$(openssl rand -base64 48)}" \
-AUTORISER_MODE_DEMO=1 NODE_ENV=production PORT="$PORT" NEXTAUTH_URL="$URL" npx tsx server.ts
+AUTORISER_MODE_DEMO=1 EXIGER_DOCUMENTS=false NODE_ENV=production PORT="$PORT" NEXTAUTH_URL="$URL" npx tsx server.ts

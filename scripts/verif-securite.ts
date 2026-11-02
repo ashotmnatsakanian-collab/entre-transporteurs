@@ -15,7 +15,10 @@ import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcryptjs'
 import { creerToken } from '../src/lib/tokens'
 import { VERSION_CGU } from '../src/lib/legal'
-import { purgerDonneesExpirees } from '../src/lib/purge'
+import { purgerDonneesExpirees, purgerDocuments } from '../src/lib/purge'
+import { recalculerConformite } from '../src/lib/documents'
+import { trouverOuCreerConversation } from '../src/lib/conversations'
+import { TYPES_OBLIGATOIRES } from '../src/lib/documents-regles'
 
 const BASE = (process.env.BASE_URL ?? 'http://localhost:3001').replace(/\/$/, '')
 const MOT_DE_PASSE = 'Password123!'
@@ -76,6 +79,23 @@ class Client {
     return { statut: res.status, donnees, texte, entetes: res.headers }
   }
 
+  /** Envoi multipart (téléversement de fichier). */
+  async formulaire(chemin: string, form: FormData, method = 'POST') {
+    const res = await fetch(`${BASE}${chemin}`, { method, headers: this.entetes(), body: form, redirect: 'manual' })
+    this.retenir(res)
+    const texte = await res.text()
+    let donnees: unknown = null
+    try { donnees = JSON.parse(texte) } catch { /* non JSON */ }
+    return { statut: res.status, donnees, texte, entetes: res.headers }
+  }
+
+  /** Téléchargement binaire. */
+  async telecharger(chemin: string) {
+    const res = await fetch(`${BASE}${chemin}`, { headers: this.entetes(), redirect: 'manual' })
+    const octets = Buffer.from(await res.arrayBuffer())
+    return { statut: res.status, octets, entetes: res.headers }
+  }
+
   async connecter(email: string, motDePasse = MOT_DE_PASSE) {
     const csrf = await this.requete('/api/auth/csrf')
     const jeton = (csrf.donnees as { csrfToken: string }).csrfToken
@@ -121,6 +141,11 @@ async function main() {
   if (!sonde || !sonde.ok) {
     console.error(`❌ Serveur injoignable sur ${BASE} (lancez npm run dev).`)
     process.exit(2)
+  }
+
+  // Serveur lancé avec EXIGER_DOCUMENTS=true : les transporteurs de démonstration doivent être conformes pour que les scénarios existants s'appliquent
+  if (process.env.EXIGER_DOCUMENTS === 'true') {
+    await db.transporteurProfil.updateMany({ data: { documentsConformesJusqua: new Date(Date.now() + 365 * 86_400_000) } })
   }
 
   const anon = new Client('anonyme')
@@ -443,6 +468,168 @@ async function main() {
   verifier('la purge conserve le journal récent', (await db.journalSecurite.count({ where: { details: `${marqueur}-recent` } })) === 1)
   await db.journalSecurite.deleteMany({ where: { details: { startsWith: marqueur } } })
 
+  // ── Documents légaux des transporteurs ───────────────────────────────────────
+  section('Documents légaux (dépôt, contrôle du fichier, accès, validation)')
+  const exige = process.env.EXIGER_DOCUMENTS === 'true'
+  const emailTd = `doc-${randomBytes(3).toString('hex')}@example.invalid`
+  const tdUser = await db.user.create({
+    data: {
+      email: emailTd, nom: 'Transporteur Documents', role: 'TRANSPORTEUR', password: await hash(MOT_DE_PASSE, 10),
+      emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
+      transporteurProfil: { create: { siret: '', raisonSociale: 'Docs Test', latitude: 48.8566, longitude: 2.3522, disponible: true, vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000 } } } },
+    },
+    include: { transporteurProfil: true },
+  })
+  const tdProfilId = tdUser.transporteurProfil!.id
+  const td = new Client('transporteur documents')
+  await td.connecter(emailTd)
+  const pdfValide = Buffer.from('%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\nCONTENU-CONFIDENTIEL-VERIF\n%%EOF')
+  const ilYa = (jours: number) => new Date(Date.now() - jours * 86_400_000).toISOString().slice(0, 10)
+  const dans = (jours: number) => new Date(Date.now() + jours * 86_400_000).toISOString().slice(0, 10)
+  const envoi = (client: Client, type: string, champs: Record<string, string>, contenu: Buffer, nom = 'kbis.pdf') => {
+    const f = new FormData()
+    f.set('type', type)
+    for (const [k, v] of Object.entries(champs)) f.set(k, v)
+    f.set('fichier', new File([new Uint8Array(contenu)], nom, { type: 'application/pdf' }))
+    return client.formulaire('/api/documents', f)
+  }
+
+  verifier('dépôt sans session refusé (401)', (await envoi(anon, 'KBIS', { dateEmission: ilYa(5) }, pdfValide)).statut === 401)
+  verifier('un commissionnaire ne peut pas déposer de document (403)', (await envoi(francois, 'KBIS', { dateEmission: ilYa(5) }, pdfValide)).statut === 403)
+  verifier('liste des documents sans session refusée (401)', (await anon.requete('/api/documents')).statut === 401)
+
+  verifier('un exécutable renommé en .pdf est refusé (400)', (await envoi(td, 'KBIS', { dateEmission: ilYa(5) }, Buffer.from('MZ\x90\x00\x03\x00\x00\x00 programme'), 'kbis.pdf')).statut === 400)
+  verifier('une page HTML renommée en .pdf est refusée (400)', (await envoi(td, 'KBIS', { dateEmission: ilYa(5) }, Buffer.from('<html><script>alert(1)</script></html>'))).statut === 400)
+  verifier('un SVG avec script est refusé (400)', (await envoi(td, 'KBIS', { dateEmission: ilYa(5) }, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>'), 'kbis.svg')).statut === 400)
+  verifier('un PDF contenant du JavaScript est refusé (400)', (await envoi(td, 'KBIS', { dateEmission: ilYa(5) }, Buffer.from('%PDF-1.4\n1 0 obj << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj'))).statut === 400)
+  verifier('un fichier de plus de 5 Mo est refusé (413)', (await envoi(td, 'KBIS', { dateEmission: ilYa(5) }, Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(6 * 1024 * 1024)]))).statut === 413)
+  verifier('un type de document inconnu est refusé (400)', (await envoi(td, 'PASSEPORT', { dateEmission: ilYa(5) }, pdfValide)).statut === 400)
+  verifier('une date de délivrance manquante est refusée (400)', (await envoi(td, 'KBIS', {}, pdfValide)).statut === 400)
+  verifier('un Kbis de plus de 3 mois est refusé (400)', (await envoi(td, 'KBIS', { dateEmission: ilYa(150) }, pdfValide)).statut === 400)
+  verifier('une licence déjà expirée est refusée (400)', (await envoi(td, 'LICENCE_TRANSPORT', { dateFin: ilYa(2) }, pdfValide)).statut === 400)
+  verifier('un envoi non multipart est refusé (415)', (await td.requete('/api/documents', { method: 'POST', json: { type: 'KBIS' } })).statut === 415)
+  verifier("aucun document n'a été enregistré par ces tentatives", (await db.documentTransporteur.count({ where: { transporteurId: tdProfilId } })) === 0)
+
+  const depose = await envoi(td, 'KBIS', { dateEmission: ilYa(10) }, pdfValide)
+  const idKbis = (depose.donnees as { id?: string } | null)?.id ?? ''
+  verifier('dépôt valide accepté (201), en attente de validation', depose.statut === 201 && (depose.donnees as { statut?: string })?.statut === 'EN_ATTENTE', `statut ${depose.statut}`)
+  const contenuEnBase = await db.documentContenu.findUniqueOrThrow({ where: { documentId: idKbis } })
+  verifier('le fichier est stocké chiffré (le texte clair est introuvable en base)', !Buffer.from(contenuEnBase.donnees).includes(Buffer.from('CONTENU-CONFIDENTIEL-VERIF')))
+  const liste = await td.requete('/api/documents')
+  verifier("la liste ne renvoie jamais le contenu du fichier", liste.statut === 200 && !liste.texte.includes('CONTENU-CONFIDENTIEL') && !liste.texte.includes('donnees'))
+  const remplace = await envoi(td, 'KBIS', { dateEmission: ilYa(8) }, pdfValide)
+  verifier('remplacer un document : un seul exemplaire par type', remplace.statut === 201 && (await db.documentTransporteur.count({ where: { transporteurId: tdProfilId, type: 'KBIS' } })) === 1)
+  const idKbis2 = (remplace.donnees as { id: string }).id
+  verifier("l'ancien contenu est supprimé avec l'ancien document", (await db.documentContenu.count({ where: { documentId: idKbis } })) === 0)
+
+  // Accès au fichier
+  const proprio = await td.telecharger(`/api/documents/${idKbis2}/fichier`)
+  verifier('le propriétaire télécharge son document (contenu identique)', proprio.statut === 200 && proprio.octets.equals(pdfValide))
+  verifier('en-têtes du téléchargement : pièce jointe, nosniff, sandbox, pas de cache',
+    (proprio.entetes.get('content-disposition') ?? '').startsWith('attachment') && proprio.entetes.get('x-content-type-options') === 'nosniff' &&
+    (proprio.entetes.get('content-security-policy') ?? '').includes('sandbox') && proprio.entetes.get('cache-control') === 'no-store')
+  verifier('un autre transporteur ne peut pas lire ce document (404)', (await marie.telecharger(`/api/documents/${idKbis2}/fichier`)).statut === 404)
+  verifier('un visiteur ne peut pas lire ce document (401)', (await anon.telecharger(`/api/documents/${idKbis2}/fichier`)).statut === 401)
+  verifier('un commissionnaire ne peut pas lire un document non validé (404)', (await francois.telecharger(`/api/documents/${idKbis2}/fichier`)).statut === 404)
+  verifier("l'administrateur peut le télécharger pour examen (200)", (await admin.telecharger(`/api/documents/${idKbis2}/fichier`)).statut === 200)
+  verifier("un autre transporteur ne peut pas supprimer ce document (404)", (await marie.requete(`/api/documents/${idKbis2}`, { method: 'DELETE' })).statut === 404)
+
+  // Validation par l'administrateur
+  verifier('un transporteur ne peut pas valider un document (403)', (await td.requete(`/api/admin/documents/${idKbis2}`, { method: 'PATCH', json: { statut: 'VALIDE' } })).statut === 403)
+  verifier('un commissionnaire ne peut pas valider un document (403)', (await francois.requete(`/api/admin/documents/${idKbis2}`, { method: 'PATCH', json: { statut: 'VALIDE' } })).statut === 403)
+  verifier('un refus sans motif est rejeté (400)', (await admin.requete(`/api/admin/documents/${idKbis2}`, { method: 'PATCH', json: { statut: 'REFUSE' } })).statut === 400)
+  verifier("l'administrateur refuse avec un motif (200)", (await admin.requete(`/api/admin/documents/${idKbis2}`, { method: 'PATCH', json: { statut: 'REFUSE', motif: 'Document illisible' } })).statut === 200)
+  const apresRefus = (await td.requete('/api/documents')).donnees as { documents: Array<{ statut: string; motifRefus: string | null }> }
+  verifier('le transporteur voit le refus et son motif', apresRefus.documents[0]?.statut === 'REFUSE' && apresRefus.documents[0]?.motifRefus === 'Document illisible')
+  verifier("la page « Documents à vérifier » est réservée à l'administrateur", (await admin.requete('/admin/documents')).statut === 200 && (await francois.requete('/admin/documents')).statut >= 300)
+  verifier('la page « Mes documents » est accessible au transporteur (200)', (await td.requete('/transporteur/documents')).statut === 200)
+
+  // Dossier complet : les cinq documents déposés puis validés
+  const champsParType: Record<string, Record<string, string>> = {
+    KBIS: { dateEmission: ilYa(10) }, LICENCE_TRANSPORT: { dateFin: dans(400) }, VIGILANCE_URSSAF: { dateEmission: ilYa(20) },
+    REGULARITE_FISCALE: { dateEmission: ilYa(20) }, ASSURANCE: { dateFin: dans(200) },
+  }
+  const ids: string[] = []
+  for (const type of TYPES_OBLIGATOIRES) {
+    const r = await envoi(td, type, champsParType[type], pdfValide)
+    ids.push((r.donnees as { id: string }).id)
+  }
+  verifier('dossier incomplet tant que rien n’est validé : conformité absente', (await db.transporteurProfil.findUniqueOrThrow({ where: { id: tdProfilId } })).documentsConformesJusqua === null)
+  for (const id of ids.slice(0, 4)) await admin.requete(`/api/admin/documents/${id}`, { method: 'PATCH', json: { statut: 'VALIDE' } })
+  verifier('quatre documents validés sur cinq : toujours non conforme', (await db.transporteurProfil.findUniqueOrThrow({ where: { id: tdProfilId } })).documentsConformesJusqua === null)
+  verifier('validation du cinquième document (200)', (await admin.requete(`/api/admin/documents/${ids[4]}`, { method: 'PATCH', json: { statut: 'VALIDE' } })).statut === 200)
+  const conformite = (await db.transporteurProfil.findUniqueOrThrow({ where: { id: tdProfilId } })).documentsConformesJusqua
+  verifier('cinq documents validés : conformité jusqu’à la première échéance', !!conformite && conformite.getTime() > Date.now())
+  verifier("la validation est tracée dans le journal d'audit", (await db.journalSecurite.count({ where: { type: 'admin_action', details: { contains: 'document KBIS VALIDE' } } })) > 0)
+
+  // Partage avec un commissionnaire
+  const idLicence = ids[1]
+  verifier('commissionnaire sans partage ni conversation : refusé (404)', (await isabelle.telecharger(`/api/documents/${idLicence}/fichier`)).statut === 404)
+  verifier('le transporteur autorise le partage (200)', (await td.requete('/api/documents', { method: 'PATCH', json: { partage: true } })).statut === 200)
+  await db.conversation.deleteMany({ where: { cle: [isabelleUser.id, tdUser.id].sort().join(':') } })
+  verifier('partage autorisé mais aucune conversation : refusé (404)', (await isabelle.telecharger(`/api/documents/${idLicence}/fichier`)).statut === 404)
+  await trouverOuCreerConversation(isabelleUser.id, tdUser.id)
+  const partage = await isabelle.telecharger(`/api/documents/${idLicence}/fichier`)
+  verifier('partage + conversation : le commissionnaire télécharge un document validé (200)', partage.statut === 200 && partage.octets.equals(pdfValide))
+  verifier('ce téléchargement est tracé dans le journal', (await db.journalSecurite.count({ where: { type: 'document_telecharge', userId: isabelleUser.id } })) > 0)
+  verifier('commissionnaire sans conversation avec ce transporteur : refusé (404)', (await francois.telecharger(`/api/documents/${idLicence}/fichier`)).statut === (await db.conversation.findUnique({ where: { cle: [francoisUser.id, tdUser.id].sort().join(':') } }) ? 200 : 404))
+  await td.requete('/api/documents', { method: 'PATCH', json: { partage: false } })
+  verifier('le transporteur retire son accord : le téléchargement est refusé (404)', (await isabelle.telecharger(`/api/documents/${idLicence}/fichier`)).statut === 404)
+  const profilVu = await isabelle.requete(`/profils/${tdProfilId}`)
+  verifier('le commissionnaire voit le statut des documents sur le profil', profilVu.statut === 200 && profilVu.texte.includes('Documents légaux'))
+  await db.conversation.deleteMany({ where: { cle: [isabelleUser.id, tdUser.id].sort().join(':') } })
+
+  // Visibilité : un transporteur non conforme reste invisible (si les documents sont exigés sur ce serveur)
+  const zoneParis = { lat: 48.8566, lng: 2.3522, rayonKm: 50 }
+  const estVisible = async () => {
+    const r = await francois.requete('/api/recherche', { method: 'POST', json: zoneParis })
+    return Array.isArray(r.donnees) && (r.donnees as Array<{ id: string }>).some((t) => t.id === tdProfilId)
+  }
+  verifier('transporteur conforme : visible dans la recherche', await estVisible())
+  if (exige) {
+    await db.transporteurProfil.update({ where: { id: tdProfilId }, data: { documentsConformesJusqua: null } })
+    verifier('non conforme : invisible dans la recherche de transporteurs', !(await estVisible()))
+    const annonces = await francois.requete('/api/annonces?lat=48.8566&lng=2.3522&rayonKm=50')
+    verifier('non conforme : invisible dans les annonces', !JSON.stringify(annonces.donnees).includes(tdProfilId))
+    const accueil = await anon.requete('/')
+    verifier("non conforme : l'aperçu public n'affiche pas ses annonces", accueil.statut === 200)
+    const pub = await td.requete('/api/annonces', { method: 'POST', json: { villeDepart: 'Paris', latDepart: 48.85, lngDepart: 2.35, dateDisponibilite: new Date(Date.now() + 86_400_000).toISOString() } })
+    verifier('non conforme : publication refusée (403 DOCUMENTS_REQUIS)', pub.statut === 403 && (pub.donnees as { code?: string })?.code === 'DOCUMENTS_REQUIS')
+    verifier('non conforme : « disponible maintenant » refusé (403)', (await td.requete('/api/transporteurs/disponibilite', { method: 'PATCH', json: { disponible: true } })).statut === 403)
+    verifier('non conforme : se déclarer indisponible reste possible (200)', (await td.requete('/api/transporteurs/disponibilite', { method: 'PATCH', json: { disponible: false } })).statut === 200)
+    verifier("non conforme : n'ouvre pas de conversation (403)", (await td.requete('/api/messages', { method: 'POST', json: { destinataireId: francoisUser.id } })).statut === 403)
+    verifier("non conforme : un commissionnaire ne peut pas l'aborder (404)", (await isabelle.requete('/api/messages', { method: 'POST', json: { destinataireId: tdUser.id } })).statut === 404)
+    await recalculerConformite(tdProfilId)
+    verifier('conforme à nouveau après recalcul : visible', await estVisible())
+  }
+
+  // Expiration : un document validé dont la date est passée retire la conformité
+  await db.documentTransporteur.update({ where: { id: ids[2] }, data: { dateExpiration: new Date(Date.now() - 1000) } })
+  await recalculerConformite(tdProfilId)
+  verifier('un document expiré retire la conformité', (await db.transporteurProfil.findUniqueOrThrow({ where: { id: tdProfilId } })).documentsConformesJusqua === null)
+  const sixMois = new Date(); sixMois.setMonth(sixMois.getMonth() - 7)
+  await db.documentTransporteur.update({ where: { id: ids[2] }, data: { dateExpiration: sixMois } })
+  await purgerDocuments()
+  verifier('la purge supprime les documents expirés depuis plus de 6 mois', (await db.documentTransporteur.count({ where: { id: ids[2] } })) === 0)
+  verifier('un autre transporteur ne peut pas supprimer ce document mais le propriétaire le peut', (await td.requete(`/api/documents/${ids[0]}`, { method: 'DELETE' })).statut === 200)
+
+  // Un transporteur suspendu n'apparaît plus dans les recherches (correction)
+  const emailSusp = `susp-${randomBytes(3).toString('hex')}@example.invalid`
+  const suspendu = await db.user.create({
+    data: {
+      email: emailSusp, nom: 'Suspendu Test', role: 'TRANSPORTEUR', password: await hash(MOT_DE_PASSE, 10), suspendu: true,
+      emailVerifieLe: new Date(), cguAccepteesLe: new Date(), cguVersion: VERSION_CGU,
+      transporteurProfil: { create: { siret: '', raisonSociale: 'Suspendu Test', latitude: 48.8566, longitude: 2.3522, disponible: true, documentsConformesJusqua: new Date(Date.now() + 365 * 86_400_000), vehicules: { create: { type: 'PORTEUR', chargeUtile: 5000, immatriculation: 'ZZ-000-ZZ' } } } },
+    },
+    include: { transporteurProfil: true },
+  })
+  const rechercheSusp = await francois.requete('/api/recherche', { method: 'POST', json: zoneParis })
+  verifier("un transporteur suspendu n'apparaît pas dans la recherche", !JSON.stringify(rechercheSusp.donnees).includes(suspendu.transporteurProfil!.id))
+  await db.user.delete({ where: { id: suspendu.id } })
+
+  await db.conversation.deleteMany({ where: { cle: [isabelleUser.id, tdUser.id].sort().join(':') } })
+  await db.user.delete({ where: { id: tdUser.id } })
+
   // ── 11. Sockets ──────────────────────────────────────────────────────────────
   section('Temps réel (Socket.io)')
   const sansCookie = await connecterSocket(null)
@@ -500,6 +687,8 @@ async function main() {
 
   // ── Nettoyage ────────────────────────────────────────────────────────────────
   await db.user.deleteMany({ where: { email: ADMIN_EMAIL } })
+  // Les comptes de démonstration n'ont pas de vrais documents : on retire la conformité accordée pour le test
+  if (process.env.EXIGER_DOCUMENTS === 'true') await db.transporteurProfil.updateMany({ data: { documentsConformesJusqua: null } })
 
   console.log(`\n${'─'.repeat(60)}`)
   console.log(`${reussis} contrôles réussis, ${echecs.length} échec(s)`)

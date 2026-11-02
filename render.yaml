@@ -44,6 +44,11 @@ services:
         sync: false
       - key: EMAIL_CONTACT
         sync: false
+      # ── Documents légaux des transporteurs ───────────────────────────────────
+      - key: DOCUMENTS_CLE
+        generateValue: true  # clé de chiffrement des fichiers : la sauvegarder (la perdre rend les documents illisibles)
+      - key: EXIGER_DOCUMENTS
+        value: "true"
       # ── E-mails (confirmation d'adresse, mot de passe oublié, alertes) ───────
       - key: RESEND_API_KEY
         sync: false

@@ -111,3 +111,31 @@ export function emailAlerteBesoin(nom: string, resume: string, url: string): Ema
     entetes: piedAlerte().entetes,
   }
 }
+
+export function emailDocumentDecision(nom: string, libelle: string, valide: boolean, motif: string | null, url: string): Email {
+  const sujet = valide ? `Document validé : ${libelle}` : `Document refusé : ${libelle}`
+  const corps = valide
+    ? `<p>Bonjour ${echapperHtml(nom)}, votre document « ${echapperHtml(libelle)} » a été validé.</p>`
+    : `<p>Bonjour ${echapperHtml(nom)}, votre document « ${echapperHtml(libelle)} » n'a pas pu être validé.</p><p><strong>Motif :</strong> ${echapperHtml(motif ?? 'non précisé')}</p><p>Merci d'en déposer un nouveau depuis « Mes documents ».</p>`
+  return {
+    to: '',
+    sujet,
+    html: gabarit(sujet, corps, 'Mes documents', url),
+    texte: `Bonjour ${nom},\n\n${valide ? `Votre document « ${libelle} » a été validé.` : `Votre document « ${libelle} » n'a pas pu être validé.\nMotif : ${motif ?? 'non précisé'}\nMerci d'en déposer un nouveau.`}\n\n${url}\n`,
+  }
+}
+
+export function emailDocumentsExpiration(nom: string, lignes: string[], url: string): Email {
+  const liste = lignes.map((l) => `<li>${echapperHtml(l)}</li>`).join('')
+  return {
+    to: '',
+    sujet: 'Vos documents arrivent à expiration',
+    html: gabarit(
+      'Documents à renouveler',
+      `<p>Bonjour ${echapperHtml(nom)}, ces documents expirent bientôt. Sans renouvellement, vous cesserez d'être visible des commissionnaires.</p><ul>${liste}</ul>`,
+      'Renouveler mes documents',
+      url
+    ),
+    texte: `Bonjour ${nom},\n\nCes documents expirent bientôt (sans renouvellement, vous cesserez d'être visible des commissionnaires) :\n- ${lignes.join('\n- ')}\n\n${url}\n`,
+  }
+}

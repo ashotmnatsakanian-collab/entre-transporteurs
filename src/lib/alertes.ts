@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { db } from './db'
 import { aAccesPayant } from './acces'
+import { clauseConforme } from './documents'
 import { emailAlerteAnnonce, emailAlerteBesoin, envoyerEmail, urlApplication } from './email'
 import { recupererAnnonceDiffusion } from './geo'
 import { log, messageErreur } from './logger'
@@ -66,6 +67,7 @@ export async function declencherAlertesBesoin(besoinId: string): Promise<void> {
       FROM "TransporteurProfil" tp
       JOIN "User" u ON u.id = tp."userId"
       WHERE u."alertesEmail" AND NOT u.suspendu AND u."supprimeLe" IS NULL
+        ${clauseConforme('tp')}
         AND 6371 * acos(LEAST(1.0,
               cos(radians(${b.latDepart})) * cos(radians(tp.latitude))
               * cos(radians(tp.longitude) - radians(${b.lngDepart}))

@@ -24,9 +24,9 @@ export const EDITEUR = {
  * Version des conditions générales. À changer À CHAQUE modification substantielle des CGU ou de la
  * politique de confidentialité : tous les utilisateurs devront alors les accepter de nouveau à leur prochaine visite.
  */
-export const VERSION_CGU = '2026-10-16'
+export const VERSION_CGU = '2026-11-02'
 
-export const MISE_A_JOUR_LEGALE = '16 octobre 2026'
+export const MISE_A_JOUR_LEGALE = '2 novembre 2026'
 
 export function informationsLegalesIncompletes(): boolean {
   return [EDITEUR.nom, EDITEUR.adresse, EDITEUR.siret, EDITEUR.email, EDITEUR.directeur].some((v) => v.startsWith('[à compléter'))

@@ -3,6 +3,7 @@ import type { Server as HttpServer } from 'http'
 import { getToken } from 'next-auth/jwt'
 import { db } from './db'
 import { aAccesPayant } from './acces'
+import { transporteurEstConforme } from './documents'
 import { emailActif } from './email'
 import { ipClient } from './ip'
 import { log, messageErreur } from './logger'
@@ -162,6 +163,10 @@ export function initSocketServer(httpServer: HttpServer): SocketServer {
       const d = disponibiliteSchema.safeParse({ disponible: valeur })
       if (!d.success) return
       try {
+        if (d.data.disponible && !(await transporteurEstConforme(userId))) {
+          socket.emit('error', { message: 'Vos documents légaux doivent être validés avant de vous déclarer disponible.' })
+          return
+        }
         await db.transporteurProfil.update({ where: { userId }, data: { disponible: d.data.disponible, derniereMAJ: new Date() } })
         io.to('carte').emit('disponibilite-change', { userId, disponible: d.data.disponible })
       } catch {

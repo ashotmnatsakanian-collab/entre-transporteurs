@@ -7,7 +7,7 @@ const estProduction = process.env.NODE_ENV === 'production'
 const PAGES_PROTEGEES = ['/carte', '/transporteur', '/commissionnaire', '/profils', '/messages', '/compte', '/admin', '/accepter-cgu', '/abonnement/succes', '/abonnement/reactivation']
 const API_PROTEGEES = [
   '/api/transporteurs', '/api/commissionnaires', '/api/vehicules', '/api/recherche', '/api/messages',
-  '/api/annonces', '/api/avis', '/api/besoins', '/api/alertes', '/api/compte', '/api/signalements',
+  '/api/annonces', '/api/avis', '/api/besoins', '/api/alertes', '/api/documents', '/api/compte', '/api/signalements',
   '/api/admin', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/renvoyer-verification',
 ]
 
@@ -48,7 +48,10 @@ export async function middleware(req: NextRequest) {
   const chemin = req.nextUrl.pathname
   const estApi = chemin.startsWith('/api/')
   const nonce = btoa(crypto.randomUUID())
-  const csp = politiqueCsp(nonce, req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || 'localhost')
+  // Fichiers téléchargés (justificatifs) : rien ne doit pouvoir s'exécuter ni se charger, même si le navigateur les affiche
+  const csp = /^\/api\/documents\/[^/]+\/fichier$/.test(chemin)
+    ? "default-src 'none'; sandbox"
+    : politiqueCsp(nonce, req.headers.get('x-forwarded-host')?.split(',')[0].trim() || req.headers.get('host') || 'localhost')
 
   if (commencePar(chemin, estApi ? API_PROTEGEES : PAGES_PROTEGEES)) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })

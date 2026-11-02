@@ -95,7 +95,7 @@ async function main() {
   for (const t of TRANSPORTEURS) {
     const user = await db.user.upsert({
       where: { email: t.email },
-      update: {},
+      update: { cguAccepteesLe: new Date(), cguVersion: VERSION_CGU },
       create: {
         email: t.email,
         password: mdp,
@@ -206,7 +206,7 @@ async function main() {
   for (const c of COMMISSIONNAIRES) {
     await db.user.upsert({
       where: { email: c.email },
-      update: {},
+      update: { cguAccepteesLe: new Date(), cguVersion: VERSION_CGU },
       create: {
         email: c.email,
         password: mdp,
