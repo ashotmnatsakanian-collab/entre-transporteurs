@@ -48,7 +48,7 @@ export const inscriptionSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   role: z.enum(['TRANSPORTEUR', 'COMMISSIONNAIRE']),
-  cgu: z.literal(true, { errorMap: () => ({ message: "Vous devez accepter les conditions d'utilisation" }) }),
+  cgu: z.literal(true, { error: "Vous devez accepter les conditions d'utilisation" }),
 })
 
 export type InscriptionInput = z.infer<typeof inscriptionSchema>

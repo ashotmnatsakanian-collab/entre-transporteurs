@@ -81,7 +81,7 @@ export function gerer<C = unknown>(handler: Handler<C>) {
 
 // ── Lecture et validation du corps ─────────────────────────────────────────────
 
-export async function lireJson<T>(req: NextRequest, schema: z.ZodType<T, z.ZodTypeDef, unknown>, maxOctets = 64 * 1024): Promise<T> {
+export async function lireJson<T>(req: NextRequest, schema: z.ZodType<T, unknown>, maxOctets = 64 * 1024): Promise<T> {
   const type = (req.headers.get('content-type') ?? '').toLowerCase()
   if (!type.startsWith('application/json')) throw new ApiError(415, 'Content-Type application/json requis')
   if (Number(req.headers.get('content-length') ?? 0) > maxOctets) throw new ApiError(413, 'Requête trop volumineuse')
@@ -115,7 +115,7 @@ export async function lireFormulaire(req: NextRequest, maxOctets: number): Promi
 }
 
 /** Paramètres d'URL validés (chaînes vides ignorées ; les schémas utilisent z.coerce). */
-export function lireQuery<T>(req: NextRequest, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T {
+export function lireQuery<T>(req: NextRequest, schema: z.ZodType<T, unknown>): T {
   const brut: Record<string, string> = {}
   req.nextUrl.searchParams.forEach((valeur, cle) => {
     if (valeur !== '') brut[cle] = valeur
